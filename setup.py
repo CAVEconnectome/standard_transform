@@ -34,8 +34,8 @@ for i_l in del_ls[::-1]:
     del required[i_l]
 
 setuptools.setup(
-    name="standard_transform",
-    version=find_version("src", "__init__.py"),
+    name="standard-transform",
+    version=find_version("standard_transform", "__init__.py"),
     author="Casey Schneider-Mizell",
     author_email="caseys@alleninstitute.org",
     description="Define and repeat basic affine transformation tasks for datasets",
@@ -45,5 +45,5 @@ setuptools.setup(
     include_package_data=True,
     dependency_links=dependency_links,
     url="https://github.com/ceesem/standard_transform",
-    packages=["src"],
+    packages=["standard_transform"],
 )

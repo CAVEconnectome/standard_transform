@@ -1,4 +1,4 @@
-from base import TransformSequence, R
+from .base import TransformSequence, R
 import numpy as np
 
 def _minnie_transforms( tform ):
