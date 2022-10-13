@@ -50,3 +50,7 @@ Both functions will also take dataframe columns, for example `tform.apply(df['pt
 * `v1dd_transform_nm` : Transform from nanometer units in the original V1dd space to microns in a space where the pial surface is flat in x and z along y=0.
 
 * `v1dd_transform_vx` : Transform from voxel units in the original Minnie65 space to microns in a space where the pial surface is flat in x and z along y=0. By default, `v1dd_transform_vx()` assumes a voxel size of `[9,9,45]` nm/voxel, but specifying a voxel resolution (for example, with `minnie_transform_vx(voxel_resolution=[8,8,40])`) will use a different scale.
+
+### Identity
+
+* `identity_transform` : This transform returns the input data unchanged (although perhaps axis-projected), but can be useful for compatability purposes.
