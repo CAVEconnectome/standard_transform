@@ -4,6 +4,8 @@ Orient and scale points in EM datasets the same way!
 
 When working with EM data, often the orientation of the dataset does not match the desired orientation in space. For example, in cortical data you might want "down" to correspond to the direction orthogonal to the pial surface. This package includes prebaked affine transforms for two datasets, Minnie65 and v1dd, to convert from voxel or nanometer coordinates to a consistent oriented frame in microns.
 
+Install via `pip install standard-transform`.
+
 ## Usage
 
 At its simplest, we import the transform we want, initialize and object, and then are ready to rotate, scale, and translate away!
