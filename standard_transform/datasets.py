@@ -1,6 +1,10 @@
 from .base import TransformSequence, R
 import numpy as np
 
+def identity_transform():
+    "Returns the same points provided"
+    return TransformSequence()
+
 def _minnie_transforms( tform ):
     angle_offset = 5
     pia_point = [182873, 80680, 21469]
