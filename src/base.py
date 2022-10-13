@@ -97,8 +97,8 @@ class TransformSequence(object):
 
         Parameters
         ----------
-        projection : str
-            Which dimension to project out of the transformed data. One of "x","y", or "z".
+        projection : str or int
+            Which dimension to project out of the transformed data. One of "x","y", or "z" (or 0,1,2 equivalently).
         pts : np.ndarray or pd.Series
             Either an n x 3 array or pandas Series object with 3-element arrays as elements.
         as_int : bool, optional
@@ -106,22 +106,20 @@ class TransformSequence(object):
 
         Returns
         -------
-        _type_
-            _description_
-
-        Raises
-        ------
-        ValueError
-            _description_
+        np.array
+            N-length array 
         """
         proj_map = {
             "x": 0,
             "y": 1,
             "z": 2,
+            0: 0,
+            1: 1,
+            2: 2,
         }
 
         if projection not in proj_map:
             raise ValueError('Projection must be one of "x", "y", or "z"')
-        return np.array(self.apply(pts, as_int=as_int))[:, proj_map.get(projection, projection)]
+        return np.array(self.apply(pts, as_int=as_int))[:, proj_map.get(projection)]
 
 
