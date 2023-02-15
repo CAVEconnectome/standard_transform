@@ -7,7 +7,7 @@ def identity_transform():
 
 def _minnie_transforms( tform ):
     angle_offset = 5
-    pia_point = [182873, 80680, 21469]
+    pia_point = [[182873, 80680, 21469]]
     tform.add_rotation("z", angle_offset, degrees=True)
     tform.add_translation(
         [0, -tform.apply_project("y", pia_point)[0], 0]
@@ -16,7 +16,7 @@ def _minnie_transforms( tform ):
     return tform
 
 def _v1dd_transforms( tform ):
-    ctr = np.array([910302.55274889, 273823.89004458, 411543.78900446])
+    ctr = np.array([[910302.55274889, 273823.89004458, 411543.78900446]])
     up = np.array([-0.00497765, 0.96349375, 0.26768454])
     rot, _ = R.align_vectors(np.array([[0, 1, 0]]), [up])
 
