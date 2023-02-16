@@ -121,7 +121,7 @@ class TransformSequence(object):
             2: 2,
         }
         # If a single point is passed, then return a single number not an array.
-        if len(np.array(pts).shape)==1:
+        if len(np.array(pts).shape)==1 and not isinstance(pts, pd.Series):
             output_fn = lambda x: x[0] 
         else:
             output_fn = lambda x: x
@@ -129,10 +129,10 @@ class TransformSequence(object):
         if projection not in proj_map:
             raise ValueError('Projection must be one of "x", "y", or "z"')
         return output_fn(
-            np.array(self.apply(np.atleast_2d(pts), as_int=as_int))[:, proj_map.get(projection)]
+            np.array(np.atleast_2d(self.apply(pts, as_int=as_int)))[:, proj_map.get(projection)]
         )
 
-    def apply_dataframe(self, col, df, projection=None, as_int=False):
+    def apply_dataframe(self, col, df, projection=None, return_array=False, as_int=False):
         """Apply transformation on a dataframe position column (or prefix of a split position column).
 
         Parameters
@@ -149,7 +149,15 @@ class TransformSequence(object):
         """
         pts = get_dataframe_points(pt_col=col, df=df)
         if projection:
-            return self.apply_project(projection, pts, as_int=as_int)
+            out = self.apply_project(projection, pts, as_int=as_int)
+            if return_array:
+                return out
+            else:
+                return out.tolist()
         else:
-            return self.apply(pts, as_int)
+            out = self.apply(pts, as_int)
+            if return_array:
+                return out
+            else:
+                return out.tolist()
 

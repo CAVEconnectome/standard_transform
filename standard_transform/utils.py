@@ -6,7 +6,7 @@ SPLIT_SUFFIXES = ['x', 'y', 'z']
 
 def is_split_position(pt_col, df):
     if pt_col in df.columns:
-        return True
+        return False
     prefix_found = []
     for suf in SPLIT_SUFFIXES:
         prefix_found.append( np.any([re.search(f"^{pt_col}_{suf}", col) is not None for col in df.columns]) )
