@@ -2,6 +2,7 @@ from scipy.spatial.transform import Rotation as R
 import pandas as pd
 import numpy as np
 from collections.abc import Iterable
+from .utils import get_dataframe_points
 
 class ScaleTransform(object):
     def __init__(self, scaling):
@@ -76,9 +77,11 @@ class TransformSequence(object):
             return self.list_apply(pts, as_int=as_int)
 
     def list_apply(self, pts, as_int=False):
-        pts = np.array(pts).copy()
+        pts = np.array(pts)
+        orig_shape = pts.shape
         for t in self._transforms:
             pts = t.apply(pts)
+        pts = np.reshape(pts, orig_shape)
         if as_int:
             return pts.astype(int)
         else:
@@ -117,9 +120,44 @@ class TransformSequence(object):
             1: 1,
             2: 2,
         }
+        # If a single point is passed, then return a single number not an array.
+        if len(np.array(pts).shape)==1 and not isinstance(pts, pd.Series):
+            output_fn = lambda x: x[0] 
+        else:
+            output_fn = lambda x: x
 
         if projection not in proj_map:
             raise ValueError('Projection must be one of "x", "y", or "z"')
-        return np.array(self.apply(pts, as_int=as_int))[:, proj_map.get(projection)]
+        return output_fn(
+            np.array(np.atleast_2d(self.apply(pts, as_int=as_int)))[:, proj_map.get(projection)]
+        )
 
+    def apply_dataframe(self, col, df, projection=None, return_array=False, as_int=False):
+        """Apply transformation on a dataframe position column (or prefix of a split position column).
+
+        Parameters
+        ----------
+        col : str
+            Column name or prefix of a split position column. e.g. `pt_position` for `pt_position_x`, `pt_position_y`, `pt_position_z`.
+            Whether or not column is split is auto-determined.
+        df : pd.DataFrame
+            Dataframe with data
+        projection : str, optional
+            If specified as 'x', 'y', or 'z' return only one element, by default None.
+        as_int : bool, optional
+            If True, cast values to integers, by default False
+        """
+        pts = get_dataframe_points(pt_col=col, df=df)
+        if projection:
+            out = self.apply_project(projection, pts, as_int=as_int)
+            if return_array:
+                return out
+            else:
+                return out.tolist()
+        else:
+            out = self.apply(pts, as_int)
+            if return_array:
+                return out
+            else:
+                return out.tolist()
 
