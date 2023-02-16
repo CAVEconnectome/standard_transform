@@ -54,6 +54,17 @@ def test_convert_v1dd(vector_df,v1dd_tform_vx, v1dd_tform_nm):
     pts_post_nm = v1dd_tform_nm.apply(pts * [9,9,45])
     assert np.all(pts_post_vx.ravel()==pts_post_nm.ravel())
 
+def test_alternative_voxel_res(vector_df):
+    pts = np.vstack(vector_df['pt_position'].values)
+    pts_nm = pts * [4,4,40]
+    pts_mic = pts_nm / np.array([1000, 1000, 1000])
+
+    tform_vx = minnie_transform_vx()
+    tform_um = minnie_transform_vx([1000, 1000, 1000])
+    pts_vx = tform_vx.apply(pts)
+    pts_um = tform_um.apply(pts_mic)
+    assert np.all(pts_vx==pts_um)
+
 def test_equivalent_inputs(vector_df, split_df, minnie_tform_vx):
     pts_arr = minnie_tform_vx.apply(  np.vstack(vector_df['pt_position'].values) )
     pts_ser = minnie_tform_vx.apply(vector_df['pt_position'])

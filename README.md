@@ -18,8 +18,8 @@ from standard_transform import minnie_transform_nm
 tform_nm = minnie_transform_nm()
 ```
 
-There are two main useful functions, `apply` and `apply_project`.
-Both functions transform an `n x 3` array or pandas series with 3-element vectors to points in the new space, with the y-axis oriented along axis from pia to white matter and the units in microns.
+There are three main useful functions, `apply`, `apply_project`, and `apply_dataframe`.
+All functions transform an `n x 3` array or pandas series with 3-element vectors to points in a new space, with the y-axis oriented along axis from pia to white matter and the units in microns and the pial surface at approximately y=0.
 Using `apply` alone returns another `n x 3` array, while `apply_project` takes both an axis and points and returns just the values along that axis.
 For example, if you have skeleton vertices in nm, you can produce transformed ones with:
 
@@ -31,6 +31,22 @@ while if you just want the depth:
 
 ```python
 sk_depth = tform_nm.apply_project('y', sk.vertices)
+```
+
+These two functions can take either 3-element points, `n x 3` arrays, or a column of a pandas dataframe with 3-element vectors in each row.
+
+The third function is specifically for use with dataframes, but offers a bit more flexibility. Instead of passing the series, you pass the column name and the dataframe itself.
+
+```python
+pts_out = tform_nm.apply_dataframe(column_name, df)
+```
+
+Why is this useful when you can just use `tform.apply(df[column_name])`?
+It is often handy to work with dataframes with split position columns, where x, y, and z coordinates are in three separate columns.
+If they are named `{column_name}_x`, `{column_name}_y`, and `{column_name}_z`, then the `apply_dataframe` function will autodetect this split position situation and act seamlessly to generate points out of them.
+To get the projection functionality with the `apply_dataframe` method, pass it as an additional argument. e.g.
+```python
+pts_out_x = tform_nm.apply_dataframe(column_name, df, projection='x')
 ```
 
 ## Available transforms
