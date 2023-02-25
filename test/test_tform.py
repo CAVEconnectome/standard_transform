@@ -41,6 +41,17 @@ def split_df():
         }
     )
 
+@pytest.fixture()
+def split_df_t2():
+    return pd.DataFrame(
+        {
+            'pt_position_x_soma': [59769, 111838, 141854],
+            'pt_position_y_soma': [60738, 68905, 104048],
+            'pt_position_z_soma': [9145, 10214, 8827],
+        }
+    )
+
+
 def test_convert_minnie(vector_df,minnie_tform_vx, minnie_tform_nm):
     pts = np.vstack(vector_df['pt_position'].values)
     pts_post_vx = minnie_tform_vx.apply(pts)
@@ -65,26 +76,30 @@ def test_alternative_voxel_res(vector_df):
     pts_um = tform_um.apply(pts_mic)
     assert np.all(pts_vx==pts_um)
 
-def test_equivalent_inputs(vector_df, split_df, minnie_tform_vx):
+def test_equivalent_inputs(vector_df, split_df, split_df_t2, minnie_tform_vx):
     pts_arr = minnie_tform_vx.apply(  np.vstack(vector_df['pt_position'].values) )
     pts_ser = minnie_tform_vx.apply(vector_df['pt_position'])
     pts_df = minnie_tform_vx.apply_dataframe('pt_position', vector_df)
     pts_split = minnie_tform_vx.apply_dataframe('pt_position', split_df)
+    pts_split_t2 = minnie_tform_vx.apply_dataframe('pt_position_soma', split_df_t2)
 
     assert np.all(pts_arr==pts_ser)
     assert np.all(pts_arr==pts_df)
     assert np.all(pts_arr==pts_split)
+    assert np.all(pts_arr==pts_split_t2)
 
-def test_equivalent_inputs_projection(vector_df, split_df, minnie_tform_vx):
+
+def test_equivalent_inputs_projection(vector_df, split_df, split_df_t2, minnie_tform_vx):
     pts_arr = minnie_tform_vx.apply_project('x', np.vstack(vector_df['pt_position'].values) )
     pts_ser = minnie_tform_vx.apply_project('x', vector_df['pt_position'])
     pts_df = minnie_tform_vx.apply_dataframe('pt_position', vector_df, projection='x')
     pts_split = minnie_tform_vx.apply_dataframe('pt_position', split_df, projection='x')
+    pts_split_t2 = minnie_tform_vx.apply_dataframe('pt_position_soma', split_df_t2, projection='x')
 
     assert np.all(pts_arr==pts_ser)
     assert np.all(pts_arr==pts_df)
     assert np.all(pts_arr==pts_split)
-
+    assert np.all(pts_arr==pts_split_t2)
 
 def test_single_point(vector_df, v1dd_tform_vx):
     pt_in = vector_df.iloc[0]['pt_position']
