@@ -16,6 +16,9 @@ class ScaleTransform(object):
 
     def apply(self, pts):
         return np.atleast_2d(pts) * self._scaling
+    
+    def invert(self, pts):
+        return np.atleast_2d(pts) / self._scaling
 
     def __repr__(self):
         return f"Scale by {self._scaling}"
@@ -32,6 +35,9 @@ class TranslateTransform(object):
     def apply(self, pts):
         return np.atleast_2d(pts) + self._translate
 
+    def invert(self, pts):
+        return np.atleast_2d(pts) - self._translate
+
     def __repr__(self):
         return f"Translate by {self._translate}"
 
@@ -44,6 +50,9 @@ class RotationTransform(object):
 
     def apply(self, pts):
         return self._transform.apply(np.atleast_2d(pts))
+
+    def invert(self, pts):
+        return self._transform.inv().apply(np.atleast_2d(pts))
 
     def __repr__(self):
         return f"Rotate with params {self._params} and {self._param_kwargs}"
@@ -76,11 +85,42 @@ class TransformSequence(object):
         else:
             return self.list_apply(pts, as_int=as_int)
 
+    def invert(self, pts_tf, as_int=False):
+        """Invert points post-transform back into the original coordinate system
+
+        Parameters
+        ----------
+        pts_tf : array-like
+            Points in the post-transform coordinate system
+        as_int : bool, optional
+            Return locations as integers, by default False
+
+        Returns
+        -------
+        array-like
+            Points in the original coordinate system
+        """
+        if isinstance(pts_tf, pd.Series):
+            return self.column_invert(pts_tf, as_int=as_int)
+        else:
+            return self.list_invert(pts_tf, as_int=as_int)
+
     def list_apply(self, pts, as_int=False):
         pts = np.array(pts)
         orig_shape = pts.shape
         for t in self._transforms:
             pts = t.apply(pts)
+        pts = np.reshape(pts, orig_shape)
+        if as_int:
+            return pts.astype(int)
+        else:
+            return pts
+
+    def list_invert(self, pts, as_int=False):
+        pts = np.array(pts)
+        orig_shape = pts.shape
+        for t in self._transforms[::-1]:
+            pts = t.invert(pts)
         pts = np.reshape(pts, orig_shape)
         if as_int:
             return pts.astype(int)
@@ -94,6 +134,14 @@ class TransformSequence(object):
             return self.apply(pts, as_int=as_int)
         else:
             return self.apply(pts, as_int=as_int).tolist()
+
+    def column_invert(self, col, return_array=False, as_int=False):
+        pts = np.vstack(col)
+        out = self.apply(pts)
+        if return_array:
+            return self.invert(pts, as_int=as_int)
+        else:
+            return self.invert(pts, as_int=as_int).tolist()
 
     def apply_project(self, projection, pts, as_int=False):
         """Apply transform and extract one dimension (e.g. depth)
