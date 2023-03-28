@@ -1,5 +1,8 @@
 from .base import TransformSequence, R
+from .streamlines import Streamline
 import numpy as np
+
+V1DD_STREAMLINE_POINT_FILE = 'data/v1dd_um_streamline.json'
 
 MINNIE_PIA_POINT_NM = np.array([183013, 83535, 21480]) * [4,4,45]
 V1DD_PIA_POINT_NM = np.array([101249, 32249, 9145]) * [9,9,45]
@@ -55,3 +58,20 @@ def v1dd_transform_nm():
     "Transform for v1dd dataset from nanometers to oriented microns"
     v1dd_transform = TransformSequence()
     return _v1dd_transforms(v1dd_transform, V1DD_PIA_POINT_NM)
+
+#### STREAMLINES
+
+
+def v1dd_streamline_nm():
+    "Streamline for v1dd dataset for nm coordinates"
+    import json
+    with open(V1DD_STREAMLINE_POINT_FILE, 'r') as f:
+        points = np.array(json.load(f))
+    return Streamline(points, tform=v1dd_transform_nm(), transform_points=False)
+
+def v1dd_streamline_vx():
+    "Streamline for v1dd dataset for voxel coordinates"
+    import json
+    with open(V1DD_STREAMLINE_POINT_FILE, 'r') as f:
+        points = np.array(json.load(f))
+    return Streamline(points, tform=v1dd_transform_vx(), transform_points=False)
