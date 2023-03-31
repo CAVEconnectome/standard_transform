@@ -1,4 +1,4 @@
-from .base import TransformSequence, R
+from .base import TransformSequence, R, identity_transform
 from .streamlines import Streamline
 import numpy as np
 
@@ -7,9 +7,6 @@ V1DD_STREAMLINE_POINT_FILE = 'data/v1dd_um_streamline.json'
 MINNIE_PIA_POINT_NM = np.array([183013, 83535, 21480]) * [4,4,45]
 V1DD_PIA_POINT_NM = np.array([101249, 32249, 9145]) * [9,9,45]
 
-def identity_transform():
-    "Returns the same points provided"
-    return TransformSequence()
 
 def _minnie_transforms( tform, pia_point ):
     angle_offset = 5
@@ -22,7 +19,6 @@ def _minnie_transforms( tform, pia_point ):
     return tform
 
 def _v1dd_transforms( tform, pia_point):
-    # ctr = np.array([[910302.55274889, 273823.89004458, 411543.78900446]])
     up = np.array([-0.00497765, 0.96349375, 0.26768454])
     rot, _ = R.align_vectors(np.array([[0, 1, 0]]), [up])
 
