@@ -1,8 +1,13 @@
 from .base import TransformSequence, R, identity_transform
 from .streamlines import Streamline, identity_streamline
 import numpy as np
+import os
 
-V1DD_STREAMLINE_POINT_FILE = 'data/v1dd_um_streamline.json'
+V1DD_STREAMLINE_POINT_FILE = os.path.join(
+    os.path.dirname(__file__),
+    'data',
+    'v1dd_um_streamline.json',
+)
 
 MINNIE_PIA_POINT_NM = np.array([183013, 83535, 21480]) * [4,4,45]
 V1DD_PIA_POINT_NM = np.array([101249, 32249, 9145]) * [9,9,45]

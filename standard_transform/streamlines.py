@@ -17,7 +17,7 @@ class Streamline(object):
             If points are in the pre-transform coordinates use True, if in the post-transform coordinates use False. By default True.
         """
         if tform is None:
-            self._transform = identity_transform()
+            tform = identity_transform()
         self._transform = tform
 
         if transform_points:
@@ -74,45 +74,29 @@ class Streamline(object):
         new_xyz = np.vstack([new_x, y1, new_z]).T
         return self._transform.invert(new_xyz)
 
-    def radial_distance(self, xyz0, xyz1):
-        """Find the distance between two points in post-transform coordinates along the x-z plane using the streamline as d=0.
+    def radial_distance(self, xyz0, xyz1, transform_points=False):
+        """Find the distance between two points along the x-z plane using the streamline as d=0.
 
         Parameters
         ----------
         xyz0 : 3-element array
-            First point in the post-transform coordinates
+            First point coordinates
         xyz1 : 3-element array
-            Second point in the post-transform coordinates
+            Second point coordinates
+        transform_points : bool, optional
+            If points are in the post-transform coordinates use True, if in the pre-transform coordinates use False. By default False.
 
         Returns
         -------
         float
             Distance in the x-z plane after accounting for streamline curvature.
         """
+        if transform_points:
+            xyz0 = self._transform.apply(xyz0)
+            xyz1 = self._transform.apply(xyz1)
         new_x, new_z = self.streamline_at(xyz0, xyz1[1])
         return np.sqrt((new_x - xyz1[0]) ** 2 + (new_z - xyz1[2]) ** 2)
 
-    def radial_distance_tform(self, xyz0_raw, xyz1_raw):
-        """Distance between two points in pre-transform coordinates along the x-z plane using the streamline as d=0.
-
-        Parameters
-        ----------
-        xyz0 : 3-element array
-            First point in the pre-transform coordinates
-        xyz1 : 3-element array
-            Second point in the pre-transform coordinates
-
-
-        Returns
-        -------
-        distance : float
-            Distance in post-transform units (usually microns) after accounting for streamline curvature.
-        """
-        xyz0 = self._transform.apply(xyz0_raw)
-        xyz1 = self._transform.apply(xyz1_raw)
-        return self.radial_distance(xyz0, xyz1)
-
-
 identity_streamline = Streamline(
-    np.array([[0, 0, 0], [0, 1, 0]])
+    points=np.array([[0, 0, 0], [0, 1, 0]])
 )
