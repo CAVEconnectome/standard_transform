@@ -111,3 +111,8 @@ class Streamline(object):
         xyz0 = self._transform.apply(xyz0_raw)
         xyz1 = self._transform.apply(xyz1_raw)
         return self.radial_distance(xyz0, xyz1)
+
+
+identity_streamline = Streamline(
+    np.array([[0, 0, 0], [0, 1, 0]])
+)

@@ -1,5 +1,5 @@
 from .base import TransformSequence, R, identity_transform
-from .streamlines import Streamline
+from .streamlines import Streamline, identity_streamline
 import numpy as np
 
 V1DD_STREAMLINE_POINT_FILE = 'data/v1dd_um_streamline.json'
@@ -63,11 +63,76 @@ def v1dd_streamline_nm():
     import json
     with open(V1DD_STREAMLINE_POINT_FILE, 'r') as f:
         points = np.array(json.load(f))
-    return Streamline(points, tform=v1dd_transform_nm(), transform_points=False)
+    return Streamline(points, tform=v1dd_transform_nm, transform_points=False)
 
 def v1dd_streamline_vx():
     "Streamline for v1dd dataset for voxel coordinates"
     import json
     with open(V1DD_STREAMLINE_POINT_FILE, 'r') as f:
         points = np.array(json.load(f))
-    return Streamline(points, tform=v1dd_transform_vx(), transform_points=False)
+    return Streamline(points, tform=v1dd_transform_vx, transform_points=False)
+
+def minnie_streamline_nm():
+    "Streamline for minnie65 dataset for nm coordinates"
+    return Streamline(
+        np.array([[0, 0, 0], [0, 1, 0]]),
+        tform=minnie_transform_nm(),
+        transform_points=False,
+    )
+
+def minnie_streamline_vx():
+    "Streamline for minnie65 dataset for voxel coordinates"
+    return Streamline(
+        np.array([[0, 0, 0], [0, 1, 0]]),
+        tform=minnie_transform_vx(),
+        transform_points=False,
+    )
+
+## Dataset object
+class Dataset(object):
+    def __init__(
+        self,
+        name,
+        transform_nm,
+        transform_vx,
+        streamline_nm,
+        streamline_vx,
+    ):
+        self.name = name
+        self._transform_arbitrary = transform_vx
+        self.transform_nm = transform_nm()
+        self.trasnform_vx = transform_vx()
+
+        self.streamline_nm = streamline_nm()
+        self.streamline_vx = streamline_vx() 
+    
+    def transform_from(self, resolution):
+        """Transform from arbitrary resolution to oriented microns
+
+        Parameters
+        ----------
+        resolution : list-like
+            Resolution of original data
+
+        Returns
+        -------
+        Transform object
+        """
+        return self._transform_arbitrary(resolution)
+
+
+v1dd_ds = Dataset(
+    'v1dd',
+    v1dd_transform_nm,
+    v1dd_transform_vx,
+    v1dd_streamline_nm,
+    v1dd_streamline_vx,
+)
+
+minnie_ds = Dataset(
+    'minnie65',
+    minnie_transform_nm,
+    minnie_transform_vx,
+    minnie_streamline_nm,
+    minnie_streamline_vx,
+)
