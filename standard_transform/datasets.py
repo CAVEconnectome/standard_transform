@@ -68,14 +68,14 @@ def v1dd_streamline_nm():
     import json
     with open(V1DD_STREAMLINE_POINT_FILE, 'r') as f:
         points = np.array(json.load(f))
-    return Streamline(points, tform=v1dd_transform_nm, transform_points=False)
+    return Streamline(points, tform=v1dd_transform_nm(), transform_points=False)
 
 def v1dd_streamline_vx():
     "Streamline for v1dd dataset for voxel coordinates"
     import json
     with open(V1DD_STREAMLINE_POINT_FILE, 'r') as f:
         points = np.array(json.load(f))
-    return Streamline(points, tform=v1dd_transform_vx, transform_points=False)
+    return Streamline(points, tform=v1dd_transform_vx(), transform_points=False)
 
 def minnie_streamline_nm():
     "Streamline for minnie65 dataset for nm coordinates"
