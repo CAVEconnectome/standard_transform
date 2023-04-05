@@ -74,7 +74,7 @@ class Streamline(object):
         new_xyz = np.vstack([new_x, y1, new_z]).T
         return self._transform.invert(new_xyz)
 
-    def radial_distance(self, xyz0, xyz1, transform_points=False):
+    def radial_distance(self, xyz0, xyz1, transform_points=True):
         """Find the distance between two points along the x-z plane using the streamline as d=0.
 
         Parameters
@@ -84,7 +84,7 @@ class Streamline(object):
         xyz1 : 3-element array
             Second point coordinates
         transform_points : bool, optional
-            If points are in the post-transform coordinates use True, if in the pre-transform coordinates use False. By default False.
+            If points are in the pre-transform coordinates use True, if in the post-transform coordinates use False. By default True.
 
         Returns
         -------
@@ -94,9 +94,9 @@ class Streamline(object):
         if transform_points:
             xyz0 = self._transform.apply(xyz0)
             xyz1 = self._transform.apply(xyz1)
-        new_x, new_z = self.streamline_at(xyz0, xyz1[1])
-        return np.sqrt((new_x - xyz1[0]) ** 2 + (new_z - xyz1[2]) ** 2)
+        new_x, new_z = self.streamline_at(xyz0, xyz1[:,1])
+        return np.sqrt((new_x - xyz1[:, 0]) ** 2 + (new_z - xyz1[:, 2]) ** 2)
 
 identity_streamline = Streamline(
-    points=np.array([[0, 0, 0], [0, 1, 0]])
+    points=np.array([[0, 0, 0], [0, 1000, 0]])
 )
