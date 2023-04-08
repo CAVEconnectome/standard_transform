@@ -8,6 +8,8 @@ V1DD_STREAMLINE_POINT_FILE = os.path.join(
     'data',
     'v1dd_um_streamline.json',
 )
+MINNIE_VOXEL_RESOLUTION = np.array([4, 4, 40])
+V1DD_VOXEL_RESOLUTION = np.array([9, 9, 45])
 
 MINNIE_PIA_POINT_NM = np.array([183013, 83535, 21480]) * [4,4,45]
 V1DD_PIA_POINT_NM = np.array([101249, 32249, 9145]) * [9,9,45]
@@ -36,7 +38,7 @@ def _v1dd_transforms( tform, pia_point):
     tform.add_scaling(1 / 1000)
     return tform
 
-def minnie_transform_vx(voxel_resolution=[4,4,40]):
+def minnie_transform_vx(voxel_resolution=MINNIE_VOXEL_RESOLUTION):
     "Transform for minnie65 dataset from voxels to oriented microns"
     column_transform = TransformSequence()
     column_transform.add_scaling(voxel_resolution)
@@ -48,7 +50,7 @@ def minnie_transform_nm():
     column_transform = TransformSequence()
     return _minnie_transforms(column_transform, MINNIE_PIA_POINT_NM)
 
-def v1dd_transform_vx(voxel_resolution=[9,9,45]):
+def v1dd_transform_vx(voxel_resolution=V1DD_VOXEL_RESOLUTION):
     "Transform for v1dd dataset from voxelsto oriented microns"
     v1dd_transform = TransformSequence()
     v1dd_transform.add_scaling(voxel_resolution)
@@ -70,12 +72,12 @@ def v1dd_streamline_nm():
         points = np.array(json.load(f))
     return Streamline(points, tform=v1dd_transform_nm(), transform_points=False)
 
-def v1dd_streamline_vx():
+def v1dd_streamline_vx(voxel_resolution=V1DD_VOXEL_RESOLUTION):
     "Streamline for v1dd dataset for voxel coordinates"
     import json
     with open(V1DD_STREAMLINE_POINT_FILE, 'r') as f:
         points = np.array(json.load(f))
-    return Streamline(points, tform=v1dd_transform_vx(), transform_points=False)
+    return Streamline(points, tform=v1dd_transform_vx(voxel_resolution), transform_points=False)
 
 def minnie_streamline_nm():
     "Streamline for minnie65 dataset for nm coordinates"
@@ -85,11 +87,11 @@ def minnie_streamline_nm():
         transform_points=False,
     )
 
-def minnie_streamline_vx():
+def minnie_streamline_vx(voxel_resolution=MINNIE_VOXEL_RESOLUTION):
     "Streamline for minnie65 dataset for voxel coordinates"
     return Streamline(
-        np.array([[0, 0, 0], [0, 1, 0]]),
-        tform=minnie_transform_vx(),
+        np.array([[0, 0, 0], [0, 1000, 0]]),
+        tform=minnie_transform_vx(voxel_resolution),
         transform_points=False,
     )
 
@@ -111,7 +113,7 @@ class Dataset(object):
         self.streamline_nm = streamline_nm()
         self.streamline_vx = streamline_vx() 
     
-    def transform_from(self, resolution):
+    def transform_res(self, resolution):
         """Transform from arbitrary resolution to oriented microns
 
         Parameters
@@ -124,6 +126,20 @@ class Dataset(object):
         Transform object
         """
         return self._transform_arbitrary(resolution)
+    
+    def streamline_res(self, resolution):
+        """Streamline for dataset at arbitrary resolution
+
+        Parameters
+        ----------
+        resolution : list-like
+            Resolution of original data
+
+        Returns
+        -------
+        Streamline object
+        """
+        return self.streamline_vx(tform=self.transform_resolution(resolution))
 
 
 v1dd_ds = Dataset(
