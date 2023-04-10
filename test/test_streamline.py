@@ -1,42 +1,49 @@
 import pytest
 import pandas as pd
 import numpy as np
-from standard_transform import v1dd_streamline_nm, v1dd_streamline_vx
+from standard_transform import v1dd_ds
 
 
 @pytest.fixture()
-def v1dd_sl_nm():
-    return v1dd_streamline_nm()
-
-
-@pytest.fixture()
-def v1dd_sl_vx():
-    return v1dd_streamline_vx()
-
-
-@pytest.fixture()
-def v1dd_nm_pts():
+def pts_arb():
     return np.array(
         [
-            [339412.7, 785224.7, 326385.0],
-            [340227.5, 785612.7, 326610.0],
-            [341187.8, 786359.6, 326655.0],
-            [343244.2, 785612.7, 327375.0],
-            [342798.0, 785942.5, 327150.0],
+            [93970, 80981, 6503],
+            [121308, 87759, 7414],
+            [85876, 86346, 8505],
+            [85907, 80487, 9338],
+            [79356, 82186, 8454],
         ]
     )
 
 @pytest.fixture()
-def v1dd_vx_pts():
-    return v1dd_nm_pts() / np.array([9,9,45])
+def pts_vx(pts_arb):
+    return pts_arb * np.array([9.7,9.7,45]) / np.array([9,9,45])
 
-def test_streamline_nm(v1dd_sl_nm, v1dd_nm_pts):
-    new_pts = v1dd_sl_nm._transform.apply(v1dd_nm_pts)
-    sl_x, sl_z = v1dd_sl_nm.streamline_at(new_pts[0], [0, 1000, 2000])
-    sl_pts = v1dd_sl_nm.streamline_at(new_pts[0], [0, 1000, 2000], return_as_point=True)
-    assert np.all(sl_pts[:,0] == sl_x)
+@pytest.fixture()
+def pts_nm(pts_arb):
+    return pts_arb * np.array([9.7,9.7,45])
 
-def test_streamline_tform(v1dd_sl_nm, v1dd_sl_vx):
-    pts_nm = np.array([1000, 1000, 1000])
-    pts_vx = pts_nm / np.array([9,9,45])
-    sl_nm = v1dd_sl_nm.streamline_points_tform(pts_nm)
+@pytest.fixture()
+def root_location():
+    return np.array([817335., 611523., 336240.])
+
+def test_v1dd_streamline(pts_arb, pts_vx, pts_nm, root_location):
+
+    sl_pts_arb = v1dd_ds.streamline_res([9.7, 9.7, 45]).radial_points( root_location/[9.7,9.7,45], pts_arb)
+    sl_pts_vx = v1dd_ds.streamline_vx.radial_points( root_location/[9,9,45], pts_vx)
+    sl_pts_nm = v1dd_ds.streamline_nm.radial_points( root_location, pts_nm)
+
+    assert np.all(
+        np.isclose(sl_pts_nm, sl_pts_vx)
+    )
+
+    assert np.all(
+        np.isclose(sl_pts_nm, sl_pts_arb)
+    )
+
+
+def test_v1dd_streamline_inverse(root_location):
+    sl_pts_0 = v1dd_ds.streamline_nm.streamline_points_tform(root_location)
+    sl_pts_1 = v1dd_ds.streamline_res([9.7,9.7,45]).streamline_points_tform(root_location / [9.7, 9.7, 45]) * [9.7,9.7,45]
+    assert np.all(np.isclose(sl_pts_0, sl_pts_1))
