@@ -60,7 +60,7 @@ pts_orig = tform.invert(pts_transformed)
 ## Streamlines
 
 Because mammalian cortex is strongly organized in a laminar manner, it's often useful to distinguish radial distance from distance along the depth axis.
-However, when comparing the radial distance of points at different depths, the situation is even more complicated because the orientation of the depth axis, which we call a "streamline" is curvilinear, and changes with depth.
+However, when comparing the radial distance of points at different depths, the situation is complicated because the orientation of the depth axis, which we call a "streamline" is curvilinear, and changes with depth.
 The Streamline class helps with computing radial distances between arbitrary locations, as well as to store particular streamlines in a consistent way.
 
 Currently we just offer streamlines for the v1dd dataset, but a minnie65 one is forthcoming.
