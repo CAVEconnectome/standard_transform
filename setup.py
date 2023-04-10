@@ -43,6 +43,7 @@ setuptools.setup(
     long_description_content_type="text/markdown",
     install_requires=required,
     include_package_data=True,
+    package_data=['standard_transform/data/*.json'],
     dependency_links=dependency_links,
     url="https://github.com/ceesem/standard_transform",
     packages=["standard_transform"],
