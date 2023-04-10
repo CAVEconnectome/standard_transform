@@ -209,3 +209,7 @@ class TransformSequence(object):
             else:
                 return out.tolist()
 
+
+def identity_transform():
+    "Returns the same points provided"
+    return TransformSequence()
