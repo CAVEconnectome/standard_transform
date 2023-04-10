@@ -110,6 +110,7 @@ class Dataset(object):
         self.transform_nm = transform_nm()
         self.trasnform_vx = transform_vx()
 
+        self._streamline_arbitrary = streamline_vx
         self.streamline_nm = streamline_nm()
         self.streamline_vx = streamline_vx() 
     
@@ -139,7 +140,7 @@ class Dataset(object):
         -------
         Streamline object
         """
-        return self.streamline_vx(tform=self.transform_resolution(resolution))
+        return self._streamline_arbitrary(resolution)
 
 
 v1dd_ds = Dataset(

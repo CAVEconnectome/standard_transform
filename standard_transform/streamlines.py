@@ -103,14 +103,22 @@ class Streamline(object):
             xyz1 = self._transform.apply(xyz1)
         if xyz0.ndim != 1:
             raise ValueError("xyz0 must be a single point")
-        new_x, new_z = self.streamline_at(xyz0, xyz1[:,1])
+        new_x, new_z = self.streamline_at(xyz0, xyz1[:, 1])
         d = np.sqrt((new_x - xyz1[:, 0]) ** 2 + (new_z - xyz1[:, 2]) ** 2)
         if return_angle:
-            return d, np.arctan2(new_z - xyz1[:, 2], new_x - xyz1[:, 0])+np.pi
+            return d, np.arctan2(new_z - xyz1[:, 2], new_x - xyz1[:, 0]) + np.pi
         else:
             return d
 
-    def radial_points(self, xyz0, xyz1, transform_points=True, depth_along_streamline=True, depth_from=0, delta=0.1):
+    def radial_points(
+        self,
+        xyz0,
+        xyz1,
+        transform_points=True,
+        depth_along_streamline=True,
+        depth_from=0,
+        delta=0.1,
+    ):
         d, angle = self.radial_distance(
             xyz0,
             xyz1,
@@ -118,10 +126,19 @@ class Streamline(object):
             return_angle=True,
         )
         if depth_along_streamline:
-            y = self.depth_along(xyz1, transform_points=transform_points, delta=delta, depth_from=depth_from)
+            y = self.depth_along(
+                xyz1,
+                transform_points=transform_points,
+                delta=delta,
+                depth_from=depth_from,
+            )
         else:
-            y = xyz1[:,1]
-        return np.atleast_2d(d).T * np.vstack([np.cos(angle), np.zeros(len(y)), np.sin(angle)]).T + np.vstack([np.zeros(len(y)), y, np.zeros(len(y))]).T
+            y = xyz1[:, 1]
+        return (
+            np.atleast_2d(d).T
+            * np.vstack([np.cos(angle), np.zeros(len(y)), np.sin(angle)]).T
+            + np.vstack([np.zeros(len(y)), y, np.zeros(len(y))]).T
+        )
 
     def depth_between(self, xyz0, xyz1, delta=0.1, transform_points=True):
         """Find the distance between two points along the depth axis using the streamline.
@@ -145,22 +162,17 @@ class Streamline(object):
         if transform_points:
             xyz0 = self._transform.apply(xyz0)
             xyz1 = self._transform.apply(xyz1)
-        
+
         if xyz0.ndim != 1:
             raise ValueError("xyz0 must be a single point")
         if xyz1.ndim != 2:
             xyz1 = np.atleast_2d(xyz1)
 
-        all_ys = np.concatenate(
-            [
-                [xyz0[1]],
-                xyz1[:,1]
-            ]
-        )
+        all_ys = np.concatenate([[xyz0[1]], xyz1[:, 1]])
         ys = np.linspace(
-            np.min(all_ys)+delta,
+            np.min(all_ys) + delta,
             np.max(all_ys),
-            (np.floor(np.max(all_ys)-np.min(all_ys))/delta).astype(int),
+            (np.floor(np.max(all_ys) - np.min(all_ys)) / delta).astype(int),
         )
         ycc = np.concatenate([all_ys, ys])
         yorder = np.argsort(ycc)
@@ -168,12 +180,12 @@ class Streamline(object):
 
         intermediate_pts = np.vstack([xs, ycc[yorder], zs]).T
         ds = np.cumsum(
-            np.linalg.norm(intermediate_pts[0:-1,:] - intermediate_pts[1:,:], axis=1)
-        ) # Cumulative distance of ordered points along the streamline
+            np.linalg.norm(intermediate_pts[0:-1, :] - intermediate_pts[1:, :], axis=1)
+        )  # Cumulative distance of ordered points along the streamline
         ds = np.concatenate([[0], ds])
 
         base_d = ds[yorder.argsort()[0]]
-        return ds[yorder.argsort()[1:xyz1.shape[0]+1]] - base_d
+        return ds[yorder.argsort()[1 : xyz1.shape[0] + 1]] - base_d
 
     def depth_along(self, xyz, depth_from=0, delta=0.1, transform_points=True):
         """Find the depth from pia along the streamline.
@@ -194,13 +206,12 @@ class Streamline(object):
         """
         if transform_points:
             xyz = self._transform.apply(xyz)
-        xm = np.mean(xyz[:,0])
-        zm = np.mean(xyz[:,2])
-        base_pt = np.array([xm,depth_from,zm])
-        sl_pts = self.streamline_at(base_pt, xyz[:,1], return_as_point=True)
+        xm = np.mean(xyz[:, 0])
+        zm = np.mean(xyz[:, 2])
+        base_pt = np.array([xm, depth_from, zm])
+        sl_pts = self.streamline_at(base_pt, xyz[:, 1], return_as_point=True)
         depths = self.depth_between(base_pt, sl_pts, transform_points=False)
         return depths
 
-identity_streamline = Streamline(
-    points=np.array([[0, 0, 0], [0, 1000, 0]])
-)
+
+identity_streamline = Streamline(points=np.array([[0, 0, 0], [0, 1000, 0]]))
