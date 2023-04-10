@@ -70,20 +70,31 @@ from standard_transform import v1dd_streamline_nm, v1dd_streamline_vx
 ```
 
 A Streamline object has a few key functions.
-To get the x,z locations of a streamline passing through a core point `xyz` at a depth `y` in the post-transform space:
+To get the x,z locations of a streamline passing through a core point `xyz` at a depth or depths `y` in the post-transform space:
 ```python
 streamline.streamline_at(xyz, y)
 ```
+The argument `return_as_point` can be set to `True` to return an nx3-array instead of the x, z components separately. 
 
 To translate the points defining the streamline to intersect with a point xyz in the pre-transform space:
 ```python
 streamline.streamline_points_tform(xyz)
 ```
 
-Most importantly, to compute the radial distance in the post-transform space from two points in the pre-transform space:
+To compute the radial distance in the post-transform space from two points in the pre-transform space:
 ```python
 streamline.radial_distance(xyz0, xyz1)
 ``` 
+
+One can also get the curvilinear distance, or depth along the streamline of a point in the pre or post-transform space and y=0 in the post-transform space:
+```python
+streamline.depth_along(xyz, depth_from=0)
+```
+
+Similarly, you can put all of these together to get a point in the curvilienar space of the streamline, akin to cylindrical coordinates, where the x axis is radial distance and the y axis is depth along the streamline. For each point, an equivalent location in x,z space is found with the same radial distance and angle as the original x and z.
+```python
+xyz_rad = streamline.radial_points(xyz0, pts)
+```
 
 ## Datasets
 

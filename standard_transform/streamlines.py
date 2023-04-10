@@ -119,6 +119,29 @@ class Streamline(object):
         depth_from=0,
         delta=0.1,
     ):
+        """Returns points along the streamline at a given distance from an anchor point.
+
+        Parameters
+        ----------
+        xyz0 : np.ndarray
+            3 element point, the anchor of the radial distance measure.
+        xyz1 : np.ndarray
+            Nx3 array of points to transform.
+        transform_points : bool, optional
+            Choose whether to transform points before computing radial distances and depths, by default True
+        depth_along_streamline : bool, optional
+            If True, use path length along streamline as depth rather than the raw y coordindate, by default True
+        depth_from : int, optional
+            Sets the post-transform y coordinate to use for zero depth, by default 0.
+        delta : float, optional
+            Sets the resolution of the depth measurement. Smaller values are more accurate, by default 0.1
+
+        Returns
+        -------
+        np.array
+            Nx3 array of points with the same radial distance relative to xyz0 and depth as the input points.
+            The relative angle of x and z is maintained from the original coordinates.
+        """
         d, angle = self.radial_distance(
             xyz0,
             xyz1,
