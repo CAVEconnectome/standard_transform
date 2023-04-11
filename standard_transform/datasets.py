@@ -2,6 +2,7 @@ from .base import TransformSequence, R, identity_transform
 from .streamlines import Streamline, identity_streamline
 import numpy as np
 import os
+import warnings
 
 V1DD_STREAMLINE_POINT_FILE = os.path.join(
     os.path.dirname(__file__),
@@ -14,6 +15,11 @@ V1DD_VOXEL_RESOLUTION = np.array([9, 9, 45])
 MINNIE_PIA_POINT_NM = np.array([183013, 83535, 21480]) * [4,4,45]
 V1DD_PIA_POINT_NM = np.array([101249, 32249, 9145]) * [9,9,45]
 
+def _rotation_from_up_vector(up):
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        rot, _ = R.align_vectors(np.array([[0, 1, 0]]), [up])
+    return rot
 
 def _minnie_transforms( tform, pia_point ):
     angle_offset = 5
@@ -27,8 +33,7 @@ def _minnie_transforms( tform, pia_point ):
 
 def _v1dd_transforms( tform, pia_point):
     up = np.array([-0.00497765, 0.96349375, 0.26768454])
-    rot, _ = R.align_vectors(np.array([[0, 1, 0]]), [up])
-
+    rot = _rotation_from_up_vector(up)
     angles = rot.as_euler("xyz", degrees=True)
 
     for ind, ang in zip(["x", "y", "z"], angles):
