@@ -116,9 +116,6 @@ v1dd_ds.streamline_nm.radial_distance(xyz0, xyz1)
 
 A particular resolution can be used by passing it as an argument to `dataset.transform_res(voxel_resolution)` or `dataset.streamline_res(voxel_resolution)`.
 
-Note: Currently a data-driven streamline is only available for v1dd.
-Minnie65 is using a placeholder "identity streamline" that is just a straight line in the y direction.
-
 ### Minnie65
 
 * `minnie_transform_nm` : Transform from nanometer units in the original Minnie65 space to microns in a space where the pial surface is flat in x and z along y=0.

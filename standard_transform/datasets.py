@@ -4,11 +4,12 @@ import numpy as np
 import os
 import warnings
 
-V1DD_STREAMLINE_POINT_FILE = os.path.join(
-    os.path.dirname(__file__),
-    'data',
-    'v1dd_um_streamline.json',
-)
+def _get_data_path(filename):
+    return os.path.join(os.path.dirname(__file__), 'data', filename)
+
+V1DD_STREAMLINE_POINT_FILE = _get_data_path('v1dd_um_streamline.json')
+MINNIE_STREAMLINE_POINT_FILE = _get_data_path('minnie_um_streamline.json')
+
 MINNIE_VOXEL_RESOLUTION = np.array([4, 4, 40])
 V1DD_VOXEL_RESOLUTION = np.array([9, 9, 45])
 
@@ -87,7 +88,7 @@ def v1dd_streamline_vx(voxel_resolution=V1DD_VOXEL_RESOLUTION):
 def minnie_streamline_nm():
     "Streamline for minnie65 dataset for nm coordinates"
     return Streamline(
-        np.array([[0, 0, 0], [0, 1, 0]]),
+        MINNIE_STREAMLINE_POINT_FILE,
         tform=minnie_transform_nm(),
         transform_points=False,
     )
@@ -95,7 +96,7 @@ def minnie_streamline_nm():
 def minnie_streamline_vx(voxel_resolution=MINNIE_VOXEL_RESOLUTION):
     "Streamline for minnie65 dataset for voxel coordinates"
     return Streamline(
-        np.array([[0, 0, 0], [0, 1000, 0]]),
+        MINNIE_STREAMLINE_POINT_FILE,
         tform=minnie_transform_vx(voxel_resolution),
         transform_points=False,
     )
