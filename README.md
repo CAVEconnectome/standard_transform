@@ -95,6 +95,7 @@ Similarly, you can put all of these together to get a point in the curvilienar s
 ```python
 xyz_rad = streamline.radial_points(xyz0, pts)
 ```
+NOTE! While better than nothing, the Minnie65 streamline is much more accurate on the VISp side of the dataset (low x values) than on the HVA side (high x values). The right approach will involve creating a streamline that is interpolates values as a function of x and z instead of being a constant. To do this, we need to either create a lot more streamlines by hand (not too hard, but time consuming) or automatically generate streamlines from skeletons. This will be the ideal solution, but for now, treat the streamline as a good approximation for the VISp side of the dataset. 
 
 ## Datasets
 

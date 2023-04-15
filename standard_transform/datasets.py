@@ -1,6 +1,7 @@
 from .base import TransformSequence, R, identity_transform
 from .streamlines import Streamline, identity_streamline
 import numpy as np
+import json
 import os
 import warnings
 
@@ -73,30 +74,34 @@ def v1dd_transform_nm():
 
 def v1dd_streamline_nm():
     "Streamline for v1dd dataset for nm coordinates"
-    import json
     with open(V1DD_STREAMLINE_POINT_FILE, 'r') as f:
         points = np.array(json.load(f))
     return Streamline(points, tform=v1dd_transform_nm(), transform_points=False)
 
 def v1dd_streamline_vx(voxel_resolution=V1DD_VOXEL_RESOLUTION):
     "Streamline for v1dd dataset for voxel coordinates"
-    import json
     with open(V1DD_STREAMLINE_POINT_FILE, 'r') as f:
         points = np.array(json.load(f))
     return Streamline(points, tform=v1dd_transform_vx(voxel_resolution), transform_points=False)
 
 def minnie_streamline_nm():
     "Streamline for minnie65 dataset for nm coordinates"
+    with open(MINNIE_STREAMLINE_POINT_FILE, 'r') as f:
+        points = np.array(json.load(f))
+
     return Streamline(
-        MINNIE_STREAMLINE_POINT_FILE,
+        points,
         tform=minnie_transform_nm(),
         transform_points=False,
     )
 
 def minnie_streamline_vx(voxel_resolution=MINNIE_VOXEL_RESOLUTION):
     "Streamline for minnie65 dataset for voxel coordinates"
+    with open(MINNIE_STREAMLINE_POINT_FILE, 'r') as f:
+        points = np.array(json.load(f))
+
     return Streamline(
-        MINNIE_STREAMLINE_POINT_FILE,
+        points,
         tform=minnie_transform_vx(voxel_resolution),
         transform_points=False,
     )
