@@ -119,7 +119,7 @@ class Dataset(object):
         self.name = name
         self._transform_arbitrary = transform_vx
         self.transform_nm = transform_nm()
-        self.trasnform_vx = transform_vx()
+        self.transform_vx = transform_vx()
 
         self._streamline_arbitrary = streamline_vx
         self.streamline_nm = streamline_nm()
