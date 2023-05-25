@@ -1,7 +1,7 @@
 import numpy as np
 from scipy import interpolate
 from .base import identity_transform
-
+from .utils import is_list_like
 
 class Streamline(object):
     def __init__(self, points, tform=None, transform_points=True):
@@ -235,6 +235,90 @@ class Streamline(object):
         sl_pts = self.streamline_at(base_pt, xyz[:, 1], return_as_point=True)
         depths = self.depth_between(base_pt, sl_pts, transform_points=False)
         return depths
+
+    def transform_skeleton_vertices(self, sk, root_loc=None, depth_from=0, delta=0.1, inplace=False):
+        """Transforms skeleton vertices to the post-transform coordinate system via the radial points function.
+        Parameters
+        ----------
+        sk : trimesh.skeleton.Skeleton
+            Skeleton to transform
+        root_loc : np.ndarray, optional
+            3 element array of the root location, by default None. If none, selects the skeleton root.
+        depth_from : numeric, optional
+            Sets the post-transform y coordinate to use for zero depth, by default 0.
+        delta : float, optional
+            Sets the resolution of the depth measurement. Smaller values are more accurate, by default 0.1
+        inplace : bool, optional
+            If True, transform the vertices in place, by default False
+        """
+        if not inplace:
+            sk = sk.copy()
+        if root_loc is None:
+            root_loc = sk.root_position
+        verts_all = sk._rooted.vertices
+        sk.vertices = self.radial_points( root_loc, verts_all, depth_from=depth_from, delta=delta )
+        return sk
+
+    def transform_meshwork_vertices(self, nrn, root_loc=None, depth_from=0, delta=0.1, inplace=False):
+        """Transforms meshwork vertices to the post-transform coordinate system.
+
+        Parameters
+        ----------
+        root_loc : np.ndarray, optional
+            3 element array of the root location, by default None
+        inplace : bool, optional
+            If True, transform the vertices in place, by default False
+
+        Returns
+        -------
+        np.ndarray
+            Nx3 array of transformed vertices
+        """
+        if not inplace:
+            nrn = nrn.copy()
+        curr_mask = nrn.mesh.node_mask
+        if root_loc is None:
+            root_loc = nrn.skeleton.root_position
+        nrn.mesh.vertices = self.radial_points( root_loc, nrn.mesh.vertices, depth_from=depth_from, delta=delta )
+        nrn.skeleton.vertices = self.radial_points( root_loc, nrn.skeleton.vertices, depth_from=depth_from, delta=delta )        
+        nrn.apply_mask(curr_mask)
+        return nrn
+
+    def transform_meshwork_annotations(self, nrn, anno_dict, root_loc=None, depth_from=0, delta=0.1, inplace=False):
+        """Transforms meshwork annotations to the post-transform coordinate system via the radial points function.
+
+        Parameters
+        ----------
+        nrn : meshwork.Meshwork
+            File to transform
+        anno_dict : dict
+            Dictionary whose keys are annotation tables in the meshwork and whose values are the columns to transform (string or list of strings)
+        root_loc : array-like, optional
+            location of the root for computing radial points, by default None. If None, uses the root of the meshwork skeleton.
+        depth_from : int, optional
+            Sets the post-transform y coordinate to use for zero depth, by default 0.
+        delta : float, optional
+            Sets the resolution of the depth measurement. Smaller values are more accurate, by default 0.1
+        inplace : bool, optional
+            If True, transform the vertices in place, by default False
+
+        Returns
+        -------
+        meshwork
+            Object with transformed annotation positions.
+        """
+        if not inplace:
+            nrn = nrn.copy()
+
+        if root_loc is None:
+            root_loc = nrn.skeleton.root_position
+        for tbl in anno_dict:
+            vs = anno_dict[tbl]
+            if not is_list_like(vs):
+                vs = [vs]
+            for v in vs:
+                nrn.anno[tbl]._data[v] = self.radial_points(root_loc, np.vstack(nrn.anno[tbl]._data[v].values), depth_from=depth_from, delta=delta).tolist()
+        return nrn
 
 
 identity_streamline = Streamline(points=np.array([[0, 0, 0], [0, 1000, 0]]))

@@ -2,7 +2,7 @@ from scipy.spatial.transform import Rotation as R
 import pandas as pd
 import numpy as np
 from collections.abc import Iterable
-from .utils import get_dataframe_points
+from .utils import get_dataframe_points, is_list_like
 
 class ScaleTransform(object):
     def __init__(self, scaling):
@@ -208,6 +208,78 @@ class TransformSequence(object):
                 return out
             else:
                 return out.tolist()
+
+    def apply_skeleton(self, sk, inplace=False):
+        """Apply transformation to a meshparty Skeleton
+
+        Parameters
+        ----------
+        sk : meshparty.Skeleton
+            Skeleton to transform
+        inplace : bool, optional
+            If True, transform vertices in place, by default False
+
+        Returns
+        -------
+        Skeleton
+            Skeleton with transformed vertices
+        """
+        if not inplace:
+            sk = sk.copy()
+        sk.vertices = self.apply(sk._rooted.vertices)
+        return sk
+    
+    def apply_meshwork_vertices(self, nrn, inplace=False):
+        """Apply transformation to mesh and skeleton vertices of a meshparty Meshwork
+
+        Parameters
+        ----------
+        nrn : meshparty.meshwork.Meshwork
+            Object to transform
+        inplace : bool, optional
+            If True, transform vertices in place, by default False
+
+        Returns
+        -------
+        Skeleton
+            Skeleton with transformed vertices
+        """
+
+        if not inplace:
+            nrn = nrn.copy()
+        curr_mask = nrn.mesh.node_mask
+        nrn.reset_mask()
+        nrn.mesh.vertices = self.apply( nrn.mesh.vertices )
+        nrn.skeleton.vertices = self.apply( nrn.skeleton.vertices )
+        nrn.apply_mask(curr_mask)
+        return nrn
+
+    def apply_meshwork_annotations(self, nrn, anno_dict, inplace=False):
+        """Apply transformations to annotations in a meshwork
+
+        Parameters
+        ----------
+        nrn : meshwork.Meshwork
+            Object to transform
+        anno_dict : dict
+            Dictionary whose keys are annotation tables in the meshwork and whose values are the columns to transform (string or list of strings)
+        inplace : bool, optional
+            If True, transform vertices in place, by default False
+
+        Returns
+        -------
+        meshwork
+            Object with transformed annotation positions.
+        """
+        if not inplace:
+            nrn = nrn.copy()
+        for tbl in anno_dict:
+            vs = anno_dict[tbl]
+            if not is_list_like(vs):
+                vs = [vs]
+            for v in vs:
+                nrn.anno[tbl]._data[v] = self.apply(nrn.anno[tbl]._data[v])
+        return nrn
 
 
 def identity_transform():

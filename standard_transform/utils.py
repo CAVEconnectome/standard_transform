@@ -53,3 +53,12 @@ def get_dataframe_points(pt_col, df):
         return assemble_split_points(pt_col, df)
     else:
         return np.vstack(df[pt_col].values)
+    
+def is_list_like(x):
+    if isinstance(x, str):
+        return False
+    try:
+        len(x)
+        return True
+    except:
+        return False
