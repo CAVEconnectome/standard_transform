@@ -97,6 +97,42 @@ xyz_rad = streamline.radial_points(xyz0, pts)
 ```
 NOTE! While better than nothing, the Minnie65 streamline is much more accurate on the VISp side of the dataset (low x values) than on the HVA side (high x values). The right approach will involve creating a streamline that is interpolates values as a function of x and z instead of being a constant. To do this, we need to either create a lot more streamlines by hand (not too hard, but time consuming) or automatically generate streamlines from skeletons. This will be the ideal solution, but for now, treat the streamline as a good approximation for the VISp side of the dataset. 
 
+## Transforming skeletons
+
+Standard transform has the capability to transform [MeshParty skeletons](https://github.com/sdorkenw/MeshParty/), MeshWorks, and MeshWork annotations using streamline or affine transformation objects. Both streamline and transform objects have similar functionality.
+
+To transform the vertices of a skeleton or meshwork object with the affine transform:
+```python
+#skeleton
+skel_transformed = tform.apply_skeleton(skel)
+#meshwork
+mw_transformed = tform.apply_meshwork_vertices(mw)
+```
+will return a new skeleton object with the transformed vertices. Use the argument `inplace=True` to modify the original object.
+
+For a streamline transform, you can straighten the skeleton along the streamline coordinates. Note that this will relocate the soma or other root location to (0,0,0).
+```python
+# Streamline transform
+skel_straightened = streamline.transform_skeleton_vertices(skel)
+mw_straightened = streamline.transform_meshwork_vertices(mw)
+```
+Similarly, this will return a new object by default, but you can set `inplace=True` to modify the original object.
+By default, this will use the root location of the skeleton as the anchor for the streamline.
+To use a different point, you can specify a `root_loc`.
+Other arguments follow the function `streamline.radial_points`.
+
+Meshwork objects can also have annotations in dataframes as well as vertices. In order to transform these points, we need to specify both the name of the dataframe table and the columns to transform as a dictionary.
+```python
+# Affine transform
+mw_anno_transformed = tform.apply_meshwork_annotations(mw, anno_dict)
+# Streamline transform
+mw_anno_straightened = streamline.transform_meshwork_annotations(mw, anno_dict)
+```
+Here, `anno_dict` is a dictionary whose keys are the table names and the column is one or more dataframe columns where each row contains a 3-element point to transform.
+For example, to transform the `ctr_pt_position` column of the `pre_syn` table, you would pass `anno_dict={'pre_syn': 'ctr_pt_position'}`.
+Similar inplace argument are available as above, as well as `radial_point` arguments for the streamline version.
+Note that if you want to transform both annotation and morphology for meshwork files, you should call both the vertex transform and annotation transform functions.
+
 ## Datasets
 
 Datasets are a convenient way to store a transform and streamline together, and are the easiest way to get started.
