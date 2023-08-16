@@ -1,4 +1,4 @@
-# standard_transforms
+# standard_transform
 
 Orient and scale points in EM datasets consistently and easily.
 
