@@ -1,7 +1,9 @@
 import numpy as np
 from scipy import interpolate
+from typing import Union
 from .base import identity_transform
 from .utils import is_list_like
+
 
 class Streamline(object):
     def __init__(self, points, tform=None, transform_points=True):
@@ -35,7 +37,9 @@ class Streamline(object):
             curve_y, curve_z, kind="linear", fill_value="extrapolate"
         )
 
-    def streamline_at(self, xyz0, y1, return_as_point=False):
+    def streamline_at(
+        self, xyz0, y1, return_as_point=False
+    ) -> Union[np.ndarray, tuple]:
         """Location of the streamline passing through point xyz0 at depth y1 in the post-transform space (usually microns)
 
         Parameters
@@ -60,7 +64,7 @@ class Streamline(object):
         else:
             return new_x, new_z
 
-    def streamline_points_tform(self, xyz0_raw):
+    def streamline_points_tform(self, xyz0_raw) -> np.ndarray:
         """Returns the original streamline points at a location that passes through the given point in the pre-transform space.
 
         Parameters
@@ -79,7 +83,9 @@ class Streamline(object):
         new_xyz = np.vstack([new_x, y1, new_z]).T
         return self._transform.invert(new_xyz)
 
-    def radial_distance(self, xyz0, xyz1, transform_points=True, return_angle=False):
+    def radial_distance(
+        self, xyz0, xyz1, transform_points=True, return_angle=False
+    ) -> Union[np.ndarray, tuple]:
         """Find the distance between two points along the x-z plane using the streamline as d=0.
 
         Parameters
@@ -118,7 +124,7 @@ class Streamline(object):
         depth_along_streamline=True,
         depth_from=0,
         delta=0.1,
-    ):
+    ) -> np.ndarray:
         """Returns points along the streamline at a given distance from an anchor point.
 
         Parameters
@@ -163,7 +169,7 @@ class Streamline(object):
             + np.vstack([np.zeros(len(y)), y, np.zeros(len(y))]).T
         )
 
-    def depth_between(self, xyz0, xyz1, delta=0.1, transform_points=True):
+    def depth_between(self, xyz0, xyz1, delta=0.1, transform_points=True) -> np.ndarray:
         """Find the distance between two points along the depth axis using the streamline.
 
         Parameters
@@ -210,7 +216,9 @@ class Streamline(object):
         base_d = ds[yorder.argsort()[0]]
         return ds[yorder.argsort()[1 : xyz1.shape[0] + 1]] - base_d
 
-    def depth_along(self, xyz, depth_from=0, delta=0.1, transform_points=True):
+    def depth_along(
+        self, xyz, depth_from=0, delta=0.1, transform_points=True
+    ) -> np.ndarray:
         """Find the depth from pia along the streamline.
 
         Parameters
@@ -236,7 +244,9 @@ class Streamline(object):
         depths = self.depth_between(base_pt, sl_pts, transform_points=False)
         return depths
 
-    def transform_skeleton_vertices(self, sk, root_loc=None, depth_from=0, delta=0.1, inplace=False):
+    def transform_skeleton_vertices(
+        self, sk, root_loc=None, depth_from=0, delta=0.1, inplace=False
+    ) -> "meshparty.skeleton.Skeleton":
         """Transforms skeleton vertices to the post-transform coordinate system via the radial points function.
         Parameters
         ----------
@@ -256,10 +266,14 @@ class Streamline(object):
         if root_loc is None:
             root_loc = sk.root_position
         verts_all = sk._rooted.vertices
-        sk.vertices = self.radial_points( root_loc, verts_all, depth_from=depth_from, delta=delta )
+        sk.vertices = self.radial_points(
+            root_loc, verts_all, depth_from=depth_from, delta=delta
+        )
         return sk
 
-    def transform_meshwork_vertices(self, nrn, root_loc=None, depth_from=0, delta=0.1, inplace=False):
+    def transform_meshwork_vertices(
+        self, nrn, root_loc=None, depth_from=0, delta=0.1, inplace=False
+    ) -> "meshparty.meshwork.Meshwork":
         """Transforms meshwork vertices to the post-transform coordinate system.
 
         Parameters
@@ -279,12 +293,18 @@ class Streamline(object):
         curr_mask = nrn.mesh.node_mask
         if root_loc is None:
             root_loc = nrn.skeleton.root_position
-        nrn.mesh.vertices = self.radial_points( root_loc, nrn.mesh.vertices, depth_from=depth_from, delta=delta )
-        nrn.skeleton.vertices = self.radial_points( root_loc, nrn.skeleton.vertices, depth_from=depth_from, delta=delta )        
+        nrn.mesh.vertices = self.radial_points(
+            root_loc, nrn.mesh.vertices, depth_from=depth_from, delta=delta
+        )
+        nrn.skeleton.vertices = self.radial_points(
+            root_loc, nrn.skeleton.vertices, depth_from=depth_from, delta=delta
+        )
         nrn.apply_mask(curr_mask)
         return nrn
 
-    def transform_meshwork_annotations(self, nrn, anno_dict, root_loc=None, depth_from=0, delta=0.1, inplace=False):
+    def transform_meshwork_annotations(
+        self, nrn, anno_dict, root_loc=None, depth_from=0, delta=0.1, inplace=False
+    ) -> "meshparty.meshwork.Meshwork":
         """Transforms meshwork annotations to the post-transform coordinate system via the radial points function.
 
         Parameters
@@ -317,7 +337,12 @@ class Streamline(object):
             if not is_list_like(vs):
                 vs = [vs]
             for v in vs:
-                nrn.anno[tbl]._data[v] = self.radial_points(root_loc, np.vstack(nrn.anno[tbl]._data[v].values), depth_from=depth_from, delta=delta).tolist()
+                nrn.anno[tbl]._data[v] = self.radial_points(
+                    root_loc,
+                    np.vstack(nrn.anno[tbl]._data[v].values),
+                    depth_from=depth_from,
+                    delta=delta,
+                ).tolist()
         return nrn
 
 

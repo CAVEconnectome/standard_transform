@@ -1,8 +1,14 @@
-from scipy.spatial.transform import Rotation as R
-import pandas as pd
-import numpy as np
+from __future__ import annotations
+
 from collections.abc import Iterable
+from typing import Union
+
+import numpy as np
+import pandas as pd
+from scipy.spatial.transform import Rotation as R
+
 from .utils import get_dataframe_points, is_list_like
+
 
 class ScaleTransform(object):
     def __init__(self, scaling):
@@ -14,10 +20,10 @@ class ScaleTransform(object):
             scaling = np.array(scaling).reshape(1, 3)
         self._scaling = scaling
 
-    def apply(self, pts):
+    def apply(self, pts) -> np.ndarray:
         return np.atleast_2d(pts) * self._scaling
-    
-    def invert(self, pts):
+
+    def invert(self, pts) -> np.ndarray:
         return np.atleast_2d(pts) / self._scaling
 
     def __repr__(self):
@@ -32,10 +38,10 @@ class TranslateTransform(object):
             raise ValueError("Translate must be a three element vector")
         self._translate = np.array(translate)
 
-    def apply(self, pts):
+    def apply(self, pts) -> np.ndarray:
         return np.atleast_2d(pts) + self._translate
 
-    def invert(self, pts):
+    def invert(self, pts) -> np.ndarray:
         return np.atleast_2d(pts) - self._translate
 
     def __repr__(self):
@@ -48,10 +54,10 @@ class RotationTransform(object):
         self._param_kwargs = param_kwargs
         self._transform = R.from_euler(*self._params, **self._param_kwargs)
 
-    def apply(self, pts):
+    def apply(self, pts) -> np.ndarray:
         return self._transform.apply(np.atleast_2d(pts))
 
-    def invert(self, pts):
+    def invert(self, pts) -> np.ndarray:
         return self._transform.inv().apply(np.atleast_2d(pts))
 
     def __repr__(self):
@@ -67,25 +73,25 @@ class TransformSequence(object):
             [t.__repr__() for t in self._transforms]
         )
 
-    def add_transform(self, transform):
+    def add_transform(self, transform) -> None:
         self._transforms.append(transform)
 
-    def add_scaling(self, scaling):
+    def add_scaling(self, scaling) -> None:
         self.add_transform(ScaleTransform(scaling))
 
-    def add_translation(self, translate):
+    def add_translation(self, translate) -> None:
         self.add_transform(TranslateTransform(translate))
 
     def add_rotation(self, *rotation_params, **rotation_kwargs):
         self.add_transform(RotationTransform(*rotation_params, **rotation_kwargs))
 
-    def apply(self, pts, as_int=False):
+    def apply(self, pts, as_int=False) -> np.ndarray:
         if isinstance(pts, pd.Series):
             return self.column_apply(pts, as_int=as_int)
         else:
             return self.list_apply(pts, as_int=as_int)
 
-    def invert(self, pts_tf, as_int=False):
+    def invert(self, pts_tf, as_int=False) -> np.ndarray:
         """Invert points post-transform back into the original coordinate system
 
         Parameters
@@ -105,7 +111,7 @@ class TransformSequence(object):
         else:
             return self.list_invert(pts_tf, as_int=as_int)
 
-    def list_apply(self, pts, as_int=False):
+    def list_apply(self, pts, as_int=False) -> np.ndarray:
         pts = np.array(pts)
         orig_shape = pts.shape
         for t in self._transforms:
@@ -116,7 +122,7 @@ class TransformSequence(object):
         else:
             return pts
 
-    def list_invert(self, pts, as_int=False):
+    def list_invert(self, pts, as_int=False) -> np.ndarray:
         pts = np.array(pts)
         orig_shape = pts.shape
         for t in self._transforms[::-1]:
@@ -127,15 +133,18 @@ class TransformSequence(object):
         else:
             return pts
 
-    def column_apply(self, col, return_array=False, as_int=False):
+    def column_apply(
+        self, col, return_array=False, as_int=False
+    ) -> "Union[np.ndarray, list]":
         pts = np.vstack(col)
-        out = self.apply(pts)
         if return_array:
             return self.apply(pts, as_int=as_int)
         else:
             return self.apply(pts, as_int=as_int).tolist()
 
-    def column_invert(self, col, return_array=False, as_int=False):
+    def column_invert(
+        self, col, return_array=False, as_int=False
+    ) -> "Union[np.ndarray, list]":
         pts = np.vstack(col)
         out = self.apply(pts)
         if return_array:
@@ -143,7 +152,7 @@ class TransformSequence(object):
         else:
             return self.invert(pts, as_int=as_int).tolist()
 
-    def apply_project(self, projection, pts, as_int=False):
+    def apply_project(self, projection, pts, as_int=False) -> np.ndarray:
         """Apply transform and extract one dimension (e.g. depth)
 
         Parameters
@@ -158,7 +167,7 @@ class TransformSequence(object):
         Returns
         -------
         np.array
-            N-length array 
+            N-length array
         """
         proj_map = {
             "x": 0,
@@ -169,18 +178,26 @@ class TransformSequence(object):
             2: 2,
         }
         # If a single point is passed, then return a single number not an array.
-        if len(np.array(pts).shape)==1 and not isinstance(pts, pd.Series):
-            output_fn = lambda x: x[0] 
+        if len(np.array(pts).shape) == 1 and not isinstance(pts, pd.Series):
+
+            def output_fn(x):
+                return x[0]
         else:
-            output_fn = lambda x: x
+
+            def output_fn(x):
+                return x
 
         if projection not in proj_map:
             raise ValueError('Projection must be one of "x", "y", or "z"')
         return output_fn(
-            np.array(np.atleast_2d(self.apply(pts, as_int=as_int)))[:, proj_map.get(projection)]
+            np.array(np.atleast_2d(self.apply(pts, as_int=as_int)))[
+                :, proj_map.get(projection)
+            ]
         )
 
-    def apply_dataframe(self, col, df, projection=None, return_array=False, as_int=False):
+    def apply_dataframe(
+        self, col, df, projection=None, return_array=False, as_int=False
+    ) -> "Union[np.ndarray, list]":
         """Apply transformation on a dataframe position column (or prefix of a split position column).
 
         Parameters
@@ -209,7 +226,7 @@ class TransformSequence(object):
             else:
                 return out.tolist()
 
-    def apply_skeleton(self, sk, inplace=False):
+    def apply_skeleton(self, sk, inplace=False) -> "meshparty.skeleton.Skeleton":
         """Apply transformation to a meshparty Skeleton
 
         Parameters
@@ -228,8 +245,10 @@ class TransformSequence(object):
             sk = sk.copy()
         sk.vertices = self.apply(sk._rooted.vertices)
         return sk
-    
-    def apply_meshwork_vertices(self, nrn, inplace=False):
+
+    def apply_meshwork_vertices(
+        self, nrn, inplace=False
+    ) -> "meshparty.meshwork.Meshwork":
         """Apply transformation to mesh and skeleton vertices of a meshparty Meshwork
 
         Parameters
@@ -249,12 +268,14 @@ class TransformSequence(object):
             nrn = nrn.copy()
         curr_mask = nrn.mesh.node_mask
         nrn.reset_mask()
-        nrn.mesh.vertices = self.apply( nrn.mesh.vertices )
-        nrn.skeleton.vertices = self.apply( nrn.skeleton.vertices )
+        nrn.mesh.vertices = self.apply(nrn.mesh.vertices)
+        nrn.skeleton.vertices = self.apply(nrn.skeleton.vertices)
         nrn.apply_mask(curr_mask)
         return nrn
 
-    def apply_meshwork_annotations(self, nrn, anno_dict, inplace=False):
+    def apply_meshwork_annotations(
+        self, nrn, anno_dict, inplace=False
+    ) -> "meshparty.meshwork.Meshwork":
         """Apply transformations to annotations in a meshwork
 
         Parameters
@@ -282,6 +303,6 @@ class TransformSequence(object):
         return nrn
 
 
-def identity_transform():
+def identity_transform() -> TransformSequence:
     "Returns the same points provided"
     return TransformSequence()
