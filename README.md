@@ -63,7 +63,6 @@ Because mammalian cortex is strongly organized in a laminar manner, it's often u
 However, when comparing the radial distance of points at different depths, the situation is complicated because the orientation of the depth axis, which we call a "streamline" is curvilinear, and changes with depth.
 The Streamline class helps with computing radial distances between arbitrary locations, as well as to store particular streamlines in a consistent way.
 
-Currently we just offer streamlines for the v1dd dataset, but a minnie65 one is forthcoming.
 Like transforms, you must specify if the original data is in nm or voxels, and they are associated with a particular transform in order to use its y-axis orientation.
 ```python
 from standard_transform import v1dd_streamline_nm, v1dd_streamline_vx
@@ -95,6 +94,18 @@ Similarly, you can put all of these together to get a point in the curvilienar s
 ```python
 xyz_rad = streamline.radial_points(xyz0, pts)
 ```
+
+You can also access streamlines through the **Datasets** objects, described below:
+```python
+from standard_transform import minnie_ds
+streamline = minnie_ds.streamline_vx
+# streamline = minnie_ds.streamline_nm # alternately in nanometers
+
+from standard_transform import v1dd_ds
+streamline = v1dd_ds.streamline_vx
+# streamline = v1dd_ds.streamline_nm # alternately in nanometers
+```
+
 NOTE! While better than nothing, the Minnie65 streamline is much more accurate on the VISp side of the dataset (low x values) than on the HVA side (high x values). The right approach will involve creating a streamline that is interpolates values as a function of x and z instead of being a constant. To do this, we need to either create a lot more streamlines by hand (not too hard, but time consuming) or automatically generate streamlines from skeletons. This will be the ideal solution, but for now, treat the streamline as a good approximation for the VISp side of the dataset. 
 
 ## Transforming skeletons
