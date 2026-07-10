@@ -47,7 +47,7 @@ DATASETS = {
 }
 
 # Grid / sampling (post-transform microns)
-SEED_SPACING = 100.0   # spacing of streamline seeds in x and z
+SEED_SPACING = 200.0   # spacing of streamline seeds in x and z
 DEPTH_STEP = 40.0      # sampling along depth for each drawn streamline
 HERE = os.path.dirname(__file__)
 

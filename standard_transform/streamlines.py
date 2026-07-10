@@ -500,6 +500,9 @@ class StreamlineField(Streamline):
             tform = identity_transform()
         self._transform = tform
         self._anchor = None
+        # Provenance: the transform version whose oriented frame the grid was built in.
+        # Set from the .npz stamp by from_npz; None for a field constructed in memory.
+        self.built_transform_version = None
 
         self._x_grid = np.asarray(x_grid, dtype=float)
         self._y_grid = np.asarray(y_grid, dtype=float)
@@ -698,9 +701,25 @@ class StreamlineField(Streamline):
             xyz = self._transform.apply(xyz)
         return self._conf_interp(np.atleast_2d(xyz))
 
-    def to_npz(self, path) -> None:
-        """Save the field grid to a compressed .npz. The transform is not stored;
-        reattach one via :meth:`from_npz`."""
+    def to_npz(self, path, transform_version=None) -> None:
+        """Save the field grid to a compressed .npz.
+
+        The transform itself is not stored (reattach one via :meth:`from_npz`), but the
+        transform *version* the grid was built in is stamped as provenance so a stale
+        file -- one attached to a different transform frame later -- can be detected on
+        load. By default the version is read from the build transform
+        (``self._transform.version``); pass ``transform_version`` to set it explicitly.
+
+        Parameters
+        ----------
+        path : str
+            Output .npz path.
+        transform_version : str, optional
+            Version label of the transform whose oriented frame this grid lives in. By
+            default read from the attached transform, or omitted if it has no version.
+        """
+        if transform_version is None:
+            transform_version = getattr(self._transform, "version", None)
         np.savez_compressed(
             path,
             x_grid=self._x_grid,
@@ -709,6 +728,7 @@ class StreamlineField(Streamline):
             tangents=self._tangents,
             confidence=(self._confidence if self._confidence is not None else np.empty(0)),
             integration_step=np.array([self._integration_step], dtype=float),
+            transform_version=np.array("" if transform_version is None else str(transform_version)),
         )
 
     @classmethod
@@ -717,10 +737,12 @@ class StreamlineField(Streamline):
 
         The grid is in post-transform microns and is therefore unit-agnostic: the same
         file serves both nm and voxel variants -- only the attached transform differs.
+        The build-time transform version, if the file was stamped with one, is exposed
+        as ``built_transform_version`` (None for older, unstamped files).
         """
         with np.load(path) as dat:
             conf = dat["confidence"]
-            return cls(
+            field = cls(
                 dat["x_grid"],
                 dat["y_grid"],
                 dat["z_grid"],
@@ -729,6 +751,10 @@ class StreamlineField(Streamline):
                 tform=tform,
                 integration_step=float(dat["integration_step"][0]),
             )
+            if "transform_version" in dat:
+                stamp = str(dat["transform_version"])
+                field.built_transform_version = stamp or None
+        return field
 
 
 def _precision_smooth(mean_t, prec, n_passes, lam):

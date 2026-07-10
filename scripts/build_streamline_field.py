@@ -91,8 +91,11 @@ def main():
 
     t0 = time.time()
     field = build(paths, tform_fn, args.bin_size, args.depth_band)
+    # to_npz stamps the build transform version (from field._transform.version) so a
+    # stale field attached to a different transform frame later is caught on load.
     field.to_npz(out)
     print(f"built {field} on all paths in {time.time() - t0:.1f}s")
+    print(f"stamped transform frame: v{field._transform.version}")
     print(f"saved -> {out}  ({os.path.getsize(out) / 1024:.0f} KB)")
 
     if args.validate:

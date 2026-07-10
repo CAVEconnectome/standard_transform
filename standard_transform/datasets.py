@@ -15,9 +15,6 @@ def _get_data_path(filename):
 MINNIE_VOXEL_RESOLUTION = np.array([4, 4, 40])
 V1DD_VOXEL_RESOLUTION = np.array([9, 9, 45])
 
-MINNIE_PIA_POINT_NM = np.array([183013, 83535, 21480]) * [4, 4, 45]
-V1DD_PIA_POINT_NM = np.array([101249, 32249, 9145]) * [9, 9, 45]
-
 _DATASET_VOXEL_RESOLUTION = {
     "minnie65": MINNIE_VOXEL_RESOLUTION,
     "v1dd": V1DD_VOXEL_RESOLUTION,
@@ -39,33 +36,48 @@ _DATASET_VOXEL_RESOLUTION = {
 _TRANSFORM_VERSIONS = {
     "minnie65": {
         "1.4": {
-            "pia_point_nm": MINNIE_PIA_POINT_NM,
+            "pia_point_nm":  np.array([183013, 83535, 21480]) * [4, 4, 45],
             "z_angle_deg": 5,
             "introduced_in": "1.4",
         },
     },
     "v1dd": {
         "1.4": {
-            "pia_point_nm": V1DD_PIA_POINT_NM,
+            "pia_point_nm": np.array([101249, 32249, 9145]) * [9, 9, 45],
             "up_vector": np.array([-0.00497765, 0.96349375, 0.26768454]),
             "introduced_in": "1.4",
         },
+        "2.0": {
+            "pia_point_nm": np.array([84255, 27946, 10871]) * [9, 9, 45],
+            "up_vector": np.array([-0.00497765, 0.96349375, 0.26768454]),
+            "introduced_in": "2.0",
+        },
     },
 }
-# The affine numbers have not changed, so "1.4" remains latest even in 2.0.
-_TRANSFORM_LATEST = {"minnie65": "1.4", "v1dd": "1.4"}
+# minnie65 affine is unchanged, so "1.4" stays latest. v1dd 2.0 revises the pia point
+# (a ~39um depth shift), so it becomes latest and streamlines must be rebuilt in it.
+_TRANSFORM_LATEST = {"minnie65": "1.4", "v1dd": "2.0"}
 
+# Every streamline is defined in the oriented-micron frame of a *specific* transform
+# version: the tangent-field grid is baked in that frame, and the hand-drawn curves
+# were traced in it. So each entry pins its ``transform_version`` and the streamline is
+# always built against that transform -- never against whatever transform happens to be
+# latest. When the affine changes (as v1dd 2.0 does), a field built in the old frame is
+# no longer valid: rebuild it against the new transform (scripts/build_streamline_field.py)
+# and add a new streamline version pinning that transform version.
 _STREAMLINE_VERSIONS = {
     "minnie65": {
         "1.4": {
             "kind": "hand",
             "file": "minnie_um_streamline.json",
             "introduced_in": "1.4",
+            "transform_version": "1.4",
         },
         "2.0": {
             "kind": "field",
             "file": "minnie_streamline_field.npz",
             "introduced_in": "2.0",
+            "transform_version": "1.4",
         },
     },
     "v1dd": {
@@ -73,15 +85,22 @@ _STREAMLINE_VERSIONS = {
             "kind": "hand",
             "file": "v1dd_um_streamline.json",
             "introduced_in": "1.4",
+            "transform_version": "1.4",
         },
         "2.0": {
             "kind": "field",
             "file": "v1dd_streamline_field.npz",
             "introduced_in": "2.0",
+            # Built in the v1dd transform-2.0 frame (new pia point). The shipped .npz
+            # must be regenerated against transform 2.0; see build_streamline_field.py.
+            "transform_version": "2.0",
         },
     },
 }
-_STREAMLINE_LATEST = {"minnie65": "2.0", "v1dd": "2.0"}
+# Defaults align each dataset to a single version: minnie65 stays on 1.4 (its affine is
+# unchanged and it defaults to the hand streamline; the field is reachable via "2.0"),
+# while v1dd advances to 2.0 (new pia-point transform + rebuilt field).
+_STREAMLINE_LATEST = {"minnie65": "1.4", "v1dd": "2.0"}
 
 
 def _resolve(registry, latest, dataset, version, kind_label):
@@ -111,8 +130,11 @@ def available_versions(dataset):
     -------
     dict
         ``{"transform": {"latest": <label>, "versions": {<label>: <introduced_in>}},
-        "streamline": {...}}``. The two tracks are versioned independently; each label
-        is the package release in which that definition became the default.
+        "streamline": {"latest": ..., "versions": {...}, "transform_versions":
+        {<label>: <transform version the streamline is built in>}}}``. The two tracks
+        are versioned independently -- each label is the package release in which that
+        definition became the default -- but every streamline pins the transform version
+        whose oriented frame its data lives in.
     """
     if dataset not in _TRANSFORM_VERSIONS:
         raise ValueError(
@@ -129,6 +151,11 @@ def available_versions(dataset):
             "latest": _STREAMLINE_LATEST[dataset],
             "versions": {
                 v: e["introduced_in"] for v, e in _STREAMLINE_VERSIONS[dataset].items()
+            },
+            # Each streamline version is built in a specific transform version's frame.
+            "transform_versions": {
+                v: e["transform_version"]
+                for v, e in _STREAMLINE_VERSIONS[dataset].items()
             },
         },
     }
@@ -230,18 +257,38 @@ def v1dd_transform(resolution="nm", version=None) -> TransformSequence:
 #### STREAMLINES
 
 
-def _build_streamline(dataset, tform, version) -> Streamline:
+def _build_streamline(dataset, resolution, version) -> Streamline:
     entry, resolved = _resolve(
         _STREAMLINE_VERSIONS, _STREAMLINE_LATEST, dataset, version, "streamline"
+    )
+    # A streamline lives in a specific transform version's oriented frame, so build that
+    # transform (at the requested resolution) rather than the current latest. The
+    # resolution only pre-scales the input; it does not affect the oriented frame the
+    # streamline data is baked in.
+    tform_version = entry["transform_version"]
+    tform = _build_transform(
+        dataset, tform_version, _resolution_vector(resolution, dataset)
     )
     path = _get_data_path(entry["file"])
     if entry["kind"] == "field":
         sl = StreamlineField.from_npz(path, tform=tform)
+        built = sl.built_transform_version
+        if built is not None and built != tform_version:
+            warnings.warn(
+                f"The {dataset} streamline field ({entry['file']}) was built in the "
+                f"transform-{built} frame, but streamline version {resolved!r} pins it "
+                f"to transform {tform_version!r}; depths will be misaligned. Rebuild "
+                f"the field against transform {tform_version!r} with "
+                f"scripts/build_streamline_field.py.",
+                UserWarning,
+                stacklevel=2,
+            )
     else:
         with open(path, "r") as f:
             points = np.array(json.load(f))
         sl = Streamline(points, tform=tform, transform_points=False)
     sl.version = resolved
+    sl.transform_version = tform_version
     return sl
 
 
@@ -256,7 +303,7 @@ def minnie_streamline(resolution="nm", version=None) -> Streamline:
     version : str, optional
         Streamline version; by default the latest. See :func:`available_versions`.
     """
-    return _build_streamline("minnie65", minnie_transform(resolution), version)
+    return _build_streamline("minnie65", resolution, version)
 
 
 def v1dd_streamline(resolution="nm", version=None) -> Streamline:
@@ -268,7 +315,7 @@ def v1dd_streamline(resolution="nm", version=None) -> Streamline:
     streamline. See :func:`minnie_streamline` for ``resolution`` and
     :func:`available_versions`.
     """
-    return _build_streamline("v1dd", v1dd_transform(resolution), version)
+    return _build_streamline("v1dd", resolution, version)
 
 
 #### DEPRECATED ALIASES (superseded by the resolution= API above)
