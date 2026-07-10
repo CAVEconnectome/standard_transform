@@ -704,6 +704,89 @@ class StreamlineField(Streamline):
             xyz = self._transform.apply(xyz)
         return self._conf_interp(np.atleast_2d(xyz))
 
+    def to_streamline_space(self, xyz, reference_depth=0.0, transform_points=True) -> np.ndarray:
+        """Map points into a single *global* straightened (unfolded) streamline space.
+
+        Each point maps to ``(u, y, w)``: the lateral position ``(u, w)`` of the
+        streamline passing through it evaluated at ``reference_depth``, and its unchanged
+        depth ``y``. Streamlines become vertical lines (constant ``u, w``), so the field's
+        curvature is removed while every point keeps its *absolute* place in one shared
+        frame.
+
+        This is different from :meth:`radial_points` / :meth:`transformer`, which recenter
+        each cell on its own soma and report distance-from-that-soma. Here there is **one**
+        coordinate system for the whole volume, so cells at different cortical locations
+        can be plotted together in their correct relative positions (a flatmap-style
+        unfolding). It is a well-defined global chart precisely because the field is
+        curl-free -- streamlines foliate the volume without crossing -- and it is inverted
+        by :meth:`from_streamline_space`.
+
+        Parameters
+        ----------
+        xyz : nx3 array
+            Query points.
+        reference_depth : float, optional
+            Post-transform depth ``y`` at which streamlines are labeled (the unfolded
+            lateral position is taken here). By default 0.0 (the pial plane), giving each
+            streamline's pia intercept. Any fixed value works; only consistency matters.
+        transform_points : bool, optional
+            If True, transform the input from pre-transform coordinates into the grid's
+            oriented space first, by default True. The output is always in streamline
+            space (oriented microns).
+
+        Returns
+        -------
+        nx3 array
+            ``(u, y, w)`` per point: unfolded lateral x, depth (unchanged), unfolded
+            lateral z.
+
+        Notes
+        -----
+        Each point lies on its own streamline, so this integrates one streamline per
+        point; for very large inputs it is correspondingly O(n) field integrations.
+        """
+        xyz = np.atleast_2d(_asfloat(xyz))
+        if transform_points:
+            xyz = self._transform.apply(xyz)
+        out = np.empty_like(xyz)
+        for i, p in enumerate(xyz):
+            u, w = self.streamline_at(p, float(reference_depth))
+            out[i] = (u, p[1], w)
+        return out
+
+    def from_streamline_space(self, uyw, reference_depth=0.0, transform_points=True) -> np.ndarray:
+        """Inverse of :meth:`to_streamline_space`.
+
+        Given ``(u, y, w)`` in streamline space, integrate the streamline anchored at
+        ``(u, reference_depth, w)`` down to depth ``y`` to recover the oriented location.
+        Round-trips with :meth:`to_streamline_space` (to integration accuracy) because the
+        streamline through a point and the streamline through its labeled intercept are
+        the same curve.
+
+        Parameters
+        ----------
+        uyw : nx3 array
+            Points in streamline space ``(u, y, w)``.
+        reference_depth : float, optional
+            Must match the value used in the forward map, by default 0.0.
+        transform_points : bool, optional
+            If True, invert the result back to pre-transform coordinates, by default True.
+
+        Returns
+        -------
+        nx3 array
+            Oriented (or pre-transform) coordinates.
+        """
+        q = np.atleast_2d(_asfloat(uyw))
+        out = np.empty_like(q)
+        for i in range(len(q)):
+            u, y, w = q[i]
+            x, z = self.streamline_at(np.array([u, float(reference_depth), w]), float(y))
+            out[i] = (x, y, z)
+        if transform_points:
+            out = self._transform.invert(out)
+        return out
+
     def to_npz(self, path, transform_version=None, method=None, laplace_strength=None) -> None:
         """Save the field grid to a compressed .npz.
 
