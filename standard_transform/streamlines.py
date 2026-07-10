@@ -500,9 +500,12 @@ class StreamlineField(Streamline):
             tform = identity_transform()
         self._transform = tform
         self._anchor = None
-        # Provenance: the transform version whose oriented frame the grid was built in.
-        # Set from the .npz stamp by from_npz; None for a field constructed in memory.
+        # Provenance, set from the .npz stamps by from_npz (None for an in-memory field):
+        # the transform version whose oriented frame the grid was built in, and how the
+        # field was regularized (method and, for the Laplace methods, the lambda used).
         self.built_transform_version = None
+        self.build_method = None
+        self.build_laplace_strength = None
 
         self._x_grid = np.asarray(x_grid, dtype=float)
         self._y_grid = np.asarray(y_grid, dtype=float)
@@ -701,14 +704,15 @@ class StreamlineField(Streamline):
             xyz = self._transform.apply(xyz)
         return self._conf_interp(np.atleast_2d(xyz))
 
-    def to_npz(self, path, transform_version=None) -> None:
+    def to_npz(self, path, transform_version=None, method=None, laplace_strength=None) -> None:
         """Save the field grid to a compressed .npz.
 
         The transform itself is not stored (reattach one via :meth:`from_npz`), but the
         transform *version* the grid was built in is stamped as provenance so a stale
         file -- one attached to a different transform frame later -- can be detected on
-        load. By default the version is read from the build transform
-        (``self._transform.version``); pass ``transform_version`` to set it explicitly.
+        load. The build ``method`` and, for the Laplace methods, the ``laplace_strength``
+        used are stamped too. By default the transform version is read from the build
+        transform (``self._transform.version``).
 
         Parameters
         ----------
@@ -717,6 +721,10 @@ class StreamlineField(Streamline):
         transform_version : str, optional
             Version label of the transform whose oriented frame this grid lives in. By
             default read from the attached transform, or omitted if it has no version.
+        method : str, optional
+            The regularizer used to build the field (e.g. ``"laplace-fit"``).
+        laplace_strength : float, optional
+            The lambda used, for the Laplace methods (e.g. the CV-selected value).
         """
         if transform_version is None:
             transform_version = getattr(self._transform, "version", None)
@@ -729,6 +737,10 @@ class StreamlineField(Streamline):
             confidence=(self._confidence if self._confidence is not None else np.empty(0)),
             integration_step=np.array([self._integration_step], dtype=float),
             transform_version=np.array("" if transform_version is None else str(transform_version)),
+            build_method=np.array("" if method is None else str(method)),
+            build_laplace_strength=np.array(
+                np.nan if laplace_strength is None else float(laplace_strength)
+            ),
         )
 
     @classmethod
@@ -737,8 +749,9 @@ class StreamlineField(Streamline):
 
         The grid is in post-transform microns and is therefore unit-agnostic: the same
         file serves both nm and voxel variants -- only the attached transform differs.
-        The build-time transform version, if the file was stamped with one, is exposed
-        as ``built_transform_version`` (None for older, unstamped files).
+        Any stamped provenance is exposed as ``built_transform_version``,
+        ``build_method``, and ``build_laplace_strength`` (None for older, unstamped
+        files).
         """
         with np.load(path) as dat:
             conf = dat["confidence"]
@@ -752,8 +765,12 @@ class StreamlineField(Streamline):
                 integration_step=float(dat["integration_step"][0]),
             )
             if "transform_version" in dat:
-                stamp = str(dat["transform_version"])
-                field.built_transform_version = stamp or None
+                field.built_transform_version = str(dat["transform_version"]) or None
+            if "build_method" in dat:
+                field.build_method = str(dat["build_method"]) or None
+            if "build_laplace_strength" in dat:
+                val = float(dat["build_laplace_strength"])
+                field.build_laplace_strength = None if np.isnan(val) else val
         return field
 
 
@@ -803,6 +820,126 @@ def _precision_smooth(mean_t, prec, n_passes, lam):
     return m, p
 
 
+def _laplace_field(
+    mean_t, prec, bs, mode="fit", lam_rel=0.3, deep_layers=1, bc_weight=1e3,
+    bc_shallow_empirical=False,
+):
+    """Recover a tangent field as the gradient of a scalar depth potential (a PDE fit).
+
+    Models the streamline field as the horizontal gradient of a depth potential
+    ``phi = y + psi``: to first order the tangent ``(dx/dy, dz/dy)`` equals
+    ``(psi_x, psi_z)``, an approximation that holds in the small-tangent regime here
+    (apical axes are near-vertical). Solving for the single scalar ``psi`` -- rather than
+    smoothing the two tangent components independently as :func:`_precision_smooth` does
+    -- enforces integrability: the field is curl-free, so streamlines derive from one
+    consistent depth function and cannot cross, and a Laplacian term couples across depth
+    so the solution is harmonic where data is sparse.
+
+    Both modes minimize the same energy
+    ``sum_edges w_e (dpsi/dl - t_e)^2 + lam * sum_edges (dpsi/dl)^2`` over grid edges;
+    only the data-weight mask ``w_e`` differs:
+
+    - ``mode="fit"``  -- precision-weighted data term in *every* cell: a Laplace-
+      *regularized* fit that tracks interior orientation and fills gaps harmonically.
+    - ``mode="bc"``   -- data only on the deep boundary (empirical, precision-gated) with
+      a flat shallow face (tangent 0, inherited from the pia flattening); pure Laplace in
+      the interior. The parsimonious, boundary-driven model.
+
+    Parameters
+    ----------
+    mean_t : (nx, ny, nz, 2) array
+        Per-cell mean tangent ``(dx/dy, dz/dy)`` (zeros where empty).
+    prec : (nx, ny, nz) array
+        Per-cell precision (zero where empty); the data weight.
+    bs : 3-tuple
+        Grid spacing (hx, hy, hz) in microns.
+    mode : {"fit", "bc"}
+    lam_rel : float
+        Smoothness weight relative to the median cell precision (``fit`` mode). Larger
+        smooths more; too large washes out real depth structure (empty cells fill
+        harmonically regardless, since their data weight is zero).
+    deep_layers : int
+        Number of deep (and shallow) y-layers used as boundaries in ``bc`` mode.
+    bc_weight : float
+        Boundary data weight in ``bc`` mode (>> interior, approximating a hard BC).
+
+    Returns
+    -------
+    (nx, ny, nz, 2) array
+        The recovered tangent field ``(psi_x, psi_z)``.
+    """
+    import scipy.sparse as sp
+    from scipy.sparse.linalg import spsolve
+
+    shape = tuple(prec.shape)
+    nx, ny, nz = shape
+    N = nx * ny * nz
+    hx, hy, hz = float(bs[0]), float(bs[1]), float(bs[2])
+    tx, tz = mean_t[..., 0].ravel(), mean_t[..., 1].ravel()
+    pflat = prec.ravel()
+
+    def fwd(axis, h):
+        idx = np.arange(N).reshape(shape)
+        if axis == 0:
+            a, b = idx[:-1].ravel(), idx[1:].ravel()
+        elif axis == 1:
+            a, b = idx[:, :-1].ravel(), idx[:, 1:].ravel()
+        else:
+            a, b = idx[:, :, :-1].ravel(), idx[:, :, 1:].ravel()
+        e = a.size
+        rows = np.concatenate([np.arange(e), np.arange(e)])
+        cols = np.concatenate([b, a])
+        vals = np.concatenate([np.full(e, 1.0 / h), np.full(e, -1.0 / h)])
+        return sp.csr_matrix((vals, (rows, cols)), shape=(e, N)), a, b
+
+    Gx, ax, bx = fwd(0, hx)
+    Gy, _, _ = fwd(1, hy)
+    Gz, az, bz = fwd(2, hz)
+
+    def edge_wt_tgt(wc, tgt, a, b):
+        wa, wb = wc[a], wc[b]
+        denom = wa + wb
+        we = 0.5 * denom
+        te = np.divide(wa * tgt[a] + wb * tgt[b], denom, out=np.zeros_like(we), where=denom > 0)
+        return we, te
+
+    if mode == "fit":
+        wc, tgt_x, tgt_z = pflat, tx, tz
+        lam = lam_rel * (np.median(pflat[pflat > 0]) if np.any(pflat > 0) else 1.0)
+    elif mode == "bc":
+        jj = np.broadcast_to(np.arange(ny)[None, :, None], shape).ravel()
+        wc = np.zeros(N)
+        tgt_x, tgt_z = np.zeros(N), np.zeros(N)
+        deep = (jj >= ny - deep_layers) & (pflat > 0)  # empirical, only where data exists
+        wc[deep] = bc_weight
+        tgt_x[deep], tgt_z[deep] = tx[deep], tz[deep]
+        if bc_shallow_empirical:
+            top = (jj < deep_layers) & (pflat > 0)  # empirical shallow face too
+            wc[top] = bc_weight
+            tgt_x[top], tgt_z[top] = tx[top], tz[top]
+        else:
+            top = jj < deep_layers  # flat shallow face (tangent 0)
+            wc[top] = bc_weight
+        lam = 1.0  # interior is pure Laplace; scale is arbitrary since bc_weight >> lam
+    else:
+        raise ValueError(f"mode must be 'fit' or 'bc', got {mode!r}.")
+
+    wex, tex = edge_wt_tgt(wc, tgt_x, ax, bx)
+    wez, tez = edge_wt_tgt(wc, tgt_z, az, bz)
+    Wx, Wz = sp.diags(wex), sp.diags(wez)
+    lap = Gx.T @ Gx + Gy.T @ Gy + Gz.T @ Gz
+    A = (Gx.T @ Wx @ Gx + Gz.T @ Wz @ Gz + lam * lap).tocsr()
+    rhs = Gx.T @ (wex * tex) + Gz.T @ (wez * tez)
+    # Tiny Tikhonov term fixes the constant-potential null space; negligible on gradients.
+    A = A + (1e-6 * A.diagonal().max()) * sp.identity(N, format="csr")
+    psi = spsolve(A, rhs).reshape(shape)
+
+    out = np.zeros_like(mean_t)
+    out[..., 0] = np.gradient(psi, hx, axis=0)
+    out[..., 1] = np.gradient(psi, hz, axis=2)
+    return out
+
+
 def streamline_field_from_paths(
     paths,
     weights=None,
@@ -813,8 +950,11 @@ def streamline_field_from_paths(
     depth_band=(150.0, 700.0),
     min_dy=1e-3,
     normalize_per_path=False,
+    method="diffusion",
     smoothing_passes=None,
     smoothing_strength=0.5,
+    laplace_strength=0.05,
+    bc_deep_layers=1,
     integration_step=None,
 ) -> StreamlineField:
     """Build a :class:`StreamlineField` from a collection of pia-to-white-matter paths.
@@ -857,11 +997,25 @@ def streamline_field_from_paths(
         If True, scale each path's segment weights to sum to 1 so every neuron
         contributes equally regardless of how many segments (branches) it has. By
         default False. Combine with a single tall path per cell, or with weights.
+    method : {"diffusion", "laplace-fit", "laplace-bc"}, optional
+        How the binned per-cell tangents are regularized into a full field, by default
+        ``"diffusion"`` (precision-weighted diffusion of the two components; the shipped
+        behavior). ``"laplace-fit"`` and ``"laplace-bc"`` instead fit a scalar depth
+        potential (see :func:`_laplace_field`), which is curl-free by construction:
+        ``"laplace-fit"`` keeps a precision-weighted data term in every cell, while
+        ``"laplace-bc"`` uses only the deep boundary as an empirical condition with a
+        flat shallow face and pure Laplace in between.
     smoothing_passes : int, optional
-        Precision-weighted diffusion passes applied to the mean field (fills empty
-        cells and denoises). By default None, which uses enough passes to fill the grid.
+        Precision-weighted diffusion passes (``method="diffusion"``). By default None,
+        which uses enough passes to fill the grid.
     smoothing_strength : float, optional
         Neighbor coupling for the diffusion, by default 0.5. Larger smooths more.
+    laplace_strength : float, optional
+        Smoothness weight (relative to the median cell precision) for the Laplace
+        methods, by default 0.05. Larger smooths more.
+    bc_deep_layers : int, optional
+        Number of deep/shallow y-layers used as boundaries for ``method="laplace-bc"``,
+        by default 1.
     integration_step : float, optional
         Passed through to the resulting field. By default None (uses the y bin size).
 
@@ -964,15 +1118,25 @@ def streamline_field_from_paths(
     prec = np.zeros(shape)
     prec[filled] = counts[filled] / (var[filled] + var0)
 
-    if smoothing_passes is None:
-        smoothing_passes = int(max(shape)) + 5
-    mean_t, diffused_p = _precision_smooth(
-        mean_t, prec, smoothing_passes, smoothing_strength
-    )
-    # Any node diffusion never reached (fully disconnected) -> global mean.
-    unreached = diffused_p <= 0
-    if filled.any() and unreached.any():
-        mean_t[unreached] = mean_t[filled].mean(axis=0)
+    if method == "diffusion":
+        if smoothing_passes is None:
+            smoothing_passes = int(max(shape)) + 5
+        mean_t, diffused_p = _precision_smooth(
+            mean_t, prec, smoothing_passes, smoothing_strength
+        )
+        # Any node diffusion never reached (fully disconnected) -> global mean.
+        unreached = diffused_p <= 0
+        if filled.any() and unreached.any():
+            mean_t[unreached] = mean_t[filled].mean(axis=0)
+    elif method in ("laplace-fit", "laplace-bc"):
+        mode = "fit" if method == "laplace-fit" else "bc"
+        mean_t = _laplace_field(
+            mean_t, prec, bs, mode=mode, lam_rel=laplace_strength, deep_layers=bc_deep_layers
+        )
+    else:
+        raise ValueError(
+            f"Unknown method {method!r}; use 'diffusion', 'laplace-fit', or 'laplace-bc'."
+        )
 
     centers = [lo[a] + (np.arange(n[a]) + 0.5) * bs[a] for a in range(3)]
     return StreamlineField(

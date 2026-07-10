@@ -118,3 +118,6 @@ notebooks/
 *.mp4
 *.png
 *.tiff
+# streamline analysis outputs (scripts)
+compare_*.npz
+validation_*.npz
