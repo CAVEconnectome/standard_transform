@@ -32,7 +32,12 @@ import urllib.parse
 
 import numpy as np
 
-from standard_transform import minnie_ds, v1dd_ds
+from standard_transform import (
+    StreamlineField,
+    available_versions,
+    minnie_ds,
+    v1dd_ds,
+)
 from standard_transform.datasets import (
     MINNIE_VOXEL_RESOLUTION,
     V1DD_VOXEL_RESOLUTION,
@@ -47,20 +52,45 @@ DATASETS = {
 }
 
 # Grid / sampling (post-transform microns)
-SEED_SPACING = 200.0   # spacing of streamline seeds in x and z
+SEED_SPACING = 50.0   # spacing of streamline seeds in x and z
 DEPTH_STEP = 40.0      # sampling along depth for each drawn streamline
 HERE = os.path.dirname(__file__)
 
 
-def load_field(ds):
-    field = ds.streamline()  # shipped StreamlineField, transform already attached
-    if not hasattr(field, "_x_grid"):
-        raise SystemExit(
-            f"{ds.name} default streamline is not a field "
-            f"(got {type(field).__name__}); nothing to grid."
-        )
-    print(f"loaded {field} for {ds.name}")
-    return field
+def load_field(ds, version=None):
+    """Return a StreamlineField to grid.
+
+    With ``version`` given, that streamline version is used (and must be a field).
+    Otherwise the dataset default is tried first; if the default is not a field (e.g.
+    minnie65 defaults to the hand-drawn 1.4 streamline while its field is version 2.0),
+    fall back to the latest streamline version that *is* a field.
+    """
+    if version is not None:
+        field = ds.streamline(version=version)
+        if not isinstance(field, StreamlineField):
+            raise SystemExit(
+                f"{ds.name} streamline version {version!r} is not a field "
+                f"(got {type(field).__name__})."
+            )
+        print(f"loaded {field} for {ds.name} (version {version})")
+        return field
+
+    field = ds.streamline()  # shipped default, transform already attached
+    if isinstance(field, StreamlineField):
+        print(f"loaded {field} for {ds.name}")
+        return field
+
+    # Default isn't a field -> find the latest streamline version that is one.
+    versions = available_versions(ds.name)["streamline"]["versions"]
+    for v in sorted(versions, reverse=True):
+        cand = ds.streamline(version=v)
+        if isinstance(cand, StreamlineField):
+            print(
+                f"{ds.name} default streamline is a {type(field).__name__}; "
+                f"gridding field version {v!r} instead (pass --version to override)."
+            )
+            return cand
+    raise SystemExit(f"{ds.name} has no streamline field version to grid.")
 
 
 def streamline_lines(field, voxel_resolution):
@@ -155,6 +185,12 @@ def main():
         "--dataset", choices=sorted(DATASETS), default="v1dd", help="which field to grid"
     )
     ap.add_argument(
+        "--version",
+        default=None,
+        help="streamline version to grid (must be a field); default auto-selects the "
+        "latest field version if the dataset default is not a field",
+    )
+    ap.add_argument(
         "--datastack",
         nargs="?",
         const="",
@@ -173,7 +209,7 @@ def main():
     out_json = os.path.join(HERE, f"{args.dataset}_streamline_grid_state.json")
     out_link = os.path.join(HERE, f"{args.dataset}_streamline_grid_link.txt")
 
-    field = load_field(ds)
+    field = load_field(ds, args.version)
     lines = streamline_lines(field, voxel_resolution)
     state = make_state(lines, voxel_resolution)
     with open(out_json, "w") as f:

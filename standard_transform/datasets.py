@@ -91,8 +91,6 @@ _STREAMLINE_VERSIONS = {
             "kind": "field",
             "file": "v1dd_streamline_field.npz",
             "introduced_in": "2.0",
-            # Built in the v1dd transform-2.0 frame (new pia point). The shipped .npz
-            # must be regenerated against transform 2.0; see build_streamline_field.py.
             "transform_version": "2.0",
         },
     },
