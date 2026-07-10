@@ -63,6 +63,7 @@ plugins:
 
 nav:
   - Home: index.md
+  - Upgrading from 1.x: upgrading.md
   - Concepts:
       - The oriented frame: concepts/oriented-frame.md
       - Depth vs. radial distance: concepts/depth-and-radial-distance.md
