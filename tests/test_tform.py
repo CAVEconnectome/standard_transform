@@ -3,31 +3,29 @@ import pandas as pd
 import pytest
 
 from standard_transform import (
-    minnie_transform_nm,
-    minnie_transform_vx,
-    v1dd_transform_nm,
-    v1dd_transform_vx,
+    minnie_transform,
+    v1dd_transform,
 )
 
 
 @pytest.fixture()
 def minnie_tform_vx():
-    return minnie_transform_vx()
+    return minnie_transform("vx")
 
 
 @pytest.fixture()
 def v1dd_tform_vx():
-    return v1dd_transform_vx()
+    return v1dd_transform("vx")
 
 
 @pytest.fixture()
 def minnie_tform_nm():
-    return minnie_transform_nm()
+    return minnie_transform("nm")
 
 
 @pytest.fixture()
 def v1dd_tform_nm():
-    return v1dd_transform_nm()
+    return v1dd_transform("nm")
 
 
 @pytest.fixture()
@@ -84,8 +82,8 @@ def test_alternative_voxel_res(vector_df):
     pts_nm = pts * [4, 4, 40]
     pts_mic = pts_nm / np.array([1000, 1000, 1000])
 
-    tform_vx = minnie_transform_vx()
-    tform_um = minnie_transform_vx([1000, 1000, 1000])
+    tform_vx = minnie_transform("vx")
+    tform_um = minnie_transform([1000, 1000, 1000])
     pts_vx = tform_vx.apply(pts)
     pts_um = tform_um.apply(pts_mic)
     assert np.all(pts_vx == pts_um)

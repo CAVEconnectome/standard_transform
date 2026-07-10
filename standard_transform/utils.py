@@ -1,8 +1,33 @@
 import numpy as np
+import warnings
 from copy import deepcopy
 import re
 
 SPLIT_SUFFIXES = ['x', 'y', 'z']
+
+#: The successor library for transforming morphology objects (skeletons, meshes,
+#: meshworks). In Ossify you pass the transformation to the object, rather than a
+#: transform reaching in and mutating the object as the deprecated methods here do.
+OSSIFY_URL = "https://csdashm.com/ossify/"
+
+
+def warn_object_transform_deprecated(method_name):
+    """Emit a DeprecationWarning for a morphology-object transform method.
+
+    These methods (which mutate MeshParty skeletons/meshworks in place) are being
+    superseded by Ossify. Coordinate-array transforms (``apply``, ``apply_project``,
+    ``apply_dataframe``, ``radial_points``, ``depth_along`` ...) are not affected.
+    """
+    warnings.warn(
+        f"{method_name} is deprecated and will be removed in a future release. "
+        f"Transforming morphology objects (skeletons/meshworks) is moving to Ossify "
+        f"({OSSIFY_URL}), where you pass the transformation to the object rather than "
+        f"the transform mutating the object. To transform coordinate arrays, keep "
+        f"using apply/apply_project/apply_dataframe (and radial_points/depth_along "
+        f"for streamlines).",
+        DeprecationWarning,
+        stacklevel=3,
+    )
 
 def _t1_split_column(pt_col):
     return [f"{pt_col}_{suf}" for suf in SPLIT_SUFFIXES]

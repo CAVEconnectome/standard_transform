@@ -1,2 +1,3 @@
 include requirements.txt
 include standard_transform/data/*.json
+include standard_transform/data/*.npz

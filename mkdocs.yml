@@ -1,0 +1,82 @@
+site_name: standard_transform
+site_description: Orient and scale points in EM connectomics datasets into a consistent pia-to-white-matter frame.
+site_url: https://caveconnectome.github.io/standard_transform/
+repo_url: https://github.com/CAVEconnectome/standard_transform
+repo_name: CAVEconnectome/standard_transform
+edit_uri: edit/main/docs/
+
+theme:
+  name: material
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.top
+    - navigation.instant
+    - toc.follow
+    - content.code.copy
+    - search.suggest
+    - search.highlight
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/weather-night
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to light mode
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - md_in_html
+  - tables
+  - toc:
+      permalink: true
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.superfences
+
+plugins:
+  - search
+  - mkdocstrings:
+      handlers:
+        python:
+          options:
+            docstring_style: numpy
+            show_source: true
+            show_root_heading: true
+            show_root_full_path: false
+            heading_level: 2
+            members_order: source
+            separate_signature: true
+            show_signature_annotations: true
+            merge_init_into_class: true
+
+nav:
+  - Home: index.md
+  - Concepts:
+      - The oriented frame: concepts/oriented-frame.md
+      - Depth vs. radial distance: concepts/depth-and-radial-distance.md
+      - Streamlines vs. fields: concepts/streamlines-vs-field.md
+      - Versioning & reproducibility: concepts/versioning.md
+  - Guides:
+      - Transform points & dataframes: guides/transform-points.md
+      - Cortical depth & radial distance: guides/depth-radial.md
+      - Morphology objects (deprecated): guides/skeletons-meshworks.md
+      - Per-neuron streamline workflow: guides/per-neuron-streamline.md
+      - Build a field for a new dataset: guides/build-a-field.md
+  - Streamline field method: streamline-field-method.md
+  - Datasets: datasets.md
+  - API reference:
+      - Transforms: reference/transforms.md
+      - Streamlines: reference/streamlines.md
+      - Datasets: reference/datasets.md

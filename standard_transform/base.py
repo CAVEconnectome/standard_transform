@@ -7,7 +7,11 @@ import numpy as np
 import pandas as pd
 from scipy.spatial.transform import Rotation as R
 
-from .utils import get_dataframe_points, is_list_like
+from .utils import (
+    get_dataframe_points,
+    is_list_like,
+    warn_object_transform_deprecated,
+)
 
 
 class ScaleTransform(object):
@@ -229,6 +233,11 @@ class TransformSequence(object):
     def apply_skeleton(self, sk, inplace=False) -> "meshparty.skeleton.Skeleton":
         """Apply transformation to a meshparty Skeleton
 
+        .. deprecated::
+            Transforming morphology objects is moving to Ossify
+            (https://csdashm.com/ossify/), where the transformation is passed to the
+            object. Use :meth:`apply` on ``sk.vertices`` for coordinate arrays.
+
         Parameters
         ----------
         sk : meshparty.Skeleton
@@ -241,6 +250,7 @@ class TransformSequence(object):
         Skeleton
             Skeleton with transformed vertices
         """
+        warn_object_transform_deprecated("TransformSequence.apply_skeleton")
         if not inplace:
             sk = sk.copy()
         sk.vertices = self.apply(sk._rooted.vertices)
@@ -250,6 +260,11 @@ class TransformSequence(object):
         self, nrn, inplace=False
     ) -> "meshparty.meshwork.Meshwork":
         """Apply transformation to mesh and skeleton vertices of a meshparty Meshwork
+
+        .. deprecated::
+            Transforming morphology objects is moving to Ossify
+            (https://csdashm.com/ossify/), where the transformation is passed to the
+            object. Use :meth:`apply` on coordinate arrays.
 
         Parameters
         ----------
@@ -263,7 +278,7 @@ class TransformSequence(object):
         Skeleton
             Skeleton with transformed vertices
         """
-
+        warn_object_transform_deprecated("TransformSequence.apply_meshwork_vertices")
         if not inplace:
             nrn = nrn.copy()
         curr_mask = nrn.mesh.node_mask
@@ -277,6 +292,11 @@ class TransformSequence(object):
         self, nrn, anno_dict, inplace=False
     ) -> "meshparty.meshwork.Meshwork":
         """Apply transformations to annotations in a meshwork
+
+        .. deprecated::
+            Transforming morphology objects is moving to Ossify
+            (https://csdashm.com/ossify/), where the transformation is passed to the
+            object. Use :meth:`apply` on coordinate arrays.
 
         Parameters
         ----------
@@ -292,6 +312,7 @@ class TransformSequence(object):
         meshwork
             Object with transformed annotation positions.
         """
+        warn_object_transform_deprecated("TransformSequence.apply_meshwork_annotations")
         if not inplace:
             nrn = nrn.copy()
         for tbl in anno_dict:

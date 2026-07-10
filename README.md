@@ -1,48 +1,85 @@
 # standard_transform
 
-Orient and scale points in EM datasets consistently and easily.
+Orient and scale points in EM connectomics datasets consistently and easily.
 
-When working with EM data, often the orientation of the dataset does not match the desired orientation in space. For example, in cortical data you might want "down" to correspond to the direction orthogonal to the pial surface. This package includes prebaked affine transforms for two datasets, Minnie65 and V1dd, to convert from voxel or nanometer coordinates to a consistent oriented frame in microns.
+📖 **Full documentation: https://caveconnectome.github.io/standard_transform/**
 
-Install via `pip install standard-transform`.
+When working with EM data, the orientation of the dataset often does not match the
+orientation you want to reason in. For cortical data you usually want "down" to mean
+the direction orthogonal to the pial surface, in microns, with the pia at `y ≈ 0`.
+`standard_transform` provides pre-baked affine transforms for two datasets
+(Minnie65 and V1dd) that map voxel or nanometer coordinates into that consistent
+oriented frame, plus **streamlines** — a curvilinear depth axis — for separating
+cortical depth from lateral (radial) distance even where cortex curves.
 
-# Usage
+## Install
 
-## Transforms
-
-At its simplest, we import the transform we want, initialize and object, and then are ready to rotate, scale, and translate away!
-Let's start with going from nanometer space in Minnie to the oriented space.
-We can make the pre-baked transform by importing one of the generating functions, in this case `minnie_transform_nm`.
-
-```python
-from standard_transform import minnie_transform_nm
-
-tform_nm = minnie_transform_nm()
+```bash
+pip install standard-transform
 ```
 
-There are three main useful functions, `apply`, `apply_project`, and `apply_dataframe`.
-All functions transform an `n x 3` array or pandas series with 3-element vectors to points in a new space, with the y-axis oriented along axis from pia to white matter and the units in microns and the pial surface at approximately y=0.
-Using `apply` alone returns another `n x 3` array, while `apply_project` takes both an axis and points and returns just the values along that axis.
-For example, if you have skeleton vertices in nm, you can produce transformed ones with:
+## Quickstart
 
 ```python
-new_vertices = tform_nm.apply(sk.vertices)
+from standard_transform import minnie_ds, v1dd_ds
+
+# n x 3 points -> oriented microns (y = pia->white matter, pia at y≈0)
+# resolution defaults to "nm"; pass "vx" or an [x, y, z] list for other units.
+pts_um = minnie_ds.transform().apply(xyz_nm)
+
+# just the cortical depth (microns below pia)
+depth = minnie_ds.transform().apply_project("y", xyz_nm)
+
+# radial (in-plane) distance following the local streamline
+d = v1dd_ds.streamline().radial_distance(xyz0_nm, xyz1_nm)
 ```
 
-while if you just want the depth:
+`minnie_ds` and `v1dd_ds` bundle a transform and a streamline and are the
+recommended entry points. Both `.transform(resolution="nm", version=None)` and
+`.streamline(resolution="nm", version=None)` take the input resolution (`"nm"`,
+`"vx"`, or an `[x, y, z]` list) and an optional version.
+
+## What's in the box
+
+- **Transforms** — `apply`, `apply_project`, `apply_dataframe`, and `invert`. Point
+  units are selected with `resolution=` (`"nm"`, `"vx"`, or `[x, y, z]`). Accept
+  `n x 3` arrays, pandas Series, and split `_x/_y/_z` dataframe columns.
+- **Streamlines** — depth-along, radial distance, and cylindrical-like remapping
+  along a curvilinear pia-to-white-matter axis.
+
+> **Note:** transforming MeshParty morphology *objects* (skeletons/meshworks) is
+> deprecated and moving to [Ossify](https://csdashm.com/ossify/), where you pass the
+> transformation to the object. `standard_transform` focuses on coordinate arrays and
+> dataframes.
+
+## Streamline fields (breaking data change)
+
+The v1dd and Minnie65 streamlines are now **data-derived, spatially-varying
+`StreamlineField`s** by default, replacing the old single hand-drawn curves. This
+changes computed *results* but not the interface — `StreamlineField` is a drop-in
+subclass of `Streamline`. To recover the previous behavior:
 
 ```python
-sk_depth = tform_nm.apply_project('y', sk.vertices)
+from standard_transform import minnie_ds, v1dd_ds
+sl     = v1dd_ds.streamline()                 # data-derived field (latest, default)
+sl_old = v1dd_ds.streamline(version="1.4")    # original hand-drawn streamline
+sl_m   = minnie_ds.streamline()               # Minnie65 field (latest, default)
 ```
 
-These two functions can take either 3-element points, `n x 3` arrays, or a column of a pandas dataframe with 3-element vectors in each row.
+See the docs for the
+[concept](https://caveconnectome.github.io/standard_transform/concepts/streamlines-vs-field/),
+the [per-neuron workflow](https://caveconnectome.github.io/standard_transform/guides/per-neuron-streamline/),
+and [how the field is built](https://caveconnectome.github.io/standard_transform/streamline-field-method/).
+Older definitions stay reachable via `version=` — see
+[Versioning & reproducibility](https://caveconnectome.github.io/standard_transform/concepts/versioning/).
 
-The third function is specifically for use with dataframes, but offers a bit more flexibility. Instead of passing the series, you pass the column name and the dataframe itself.
+## Documentation
 
-```python
-pts_out = tform_nm.apply_dataframe(column_name, df)
-```
+The full guide — concepts, task-oriented tutorials, the streamline-field method, and
+the API reference — lives at
+**https://caveconnectome.github.io/standard_transform/**.
 
+<<<<<<< HEAD
 Why is this useful when you can just use `tform.apply(df[column_name])`?
 It is often handy to work with dataframes with split position columns, where x, y, and z coordinates are in three separate columns.
 If they are named `{column_name}_x`, `{column_name}_y`, and `{column_name}_z`, then the `apply_dataframe` function will autodetect this split position situation and act seamlessly to generate points out of them.
@@ -181,3 +218,7 @@ Both functions will also take dataframe columns, for example `tform.apply(df['pt
 ### Identity
 
 * `identity_transform` : This transform returns the input data unchanged (although perhaps axis-projected), but can be useful for compatability purposes.
+=======
+Build the docs locally with `uv run poe doc-preview` (serves the site with live
+reload).
+>>>>>>> 537d622 (add minnie streamline field and docs)

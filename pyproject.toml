@@ -5,8 +5,16 @@ build-backend = "hatchling.build"
 [project]
 name = "standard-transform"
 version = "1.4.1"
-description = "Define and repeat basic affine transformation tasks for datasets"
+description = "Orient and scale points, skeletons, and meshworks from EM connectomics datasets into a consistent pia-to-white-matter frame, with data-driven cortical streamlines."
 readme = "README.md"
+keywords = [
+    "connectomics",
+    "electron-microscopy",
+    "neuroscience",
+    "cortex",
+    "affine-transform",
+    "streamlines",
+]
 authors = [
     {name = "Casey Schneider-Mizell", email = "caseys@alleninstitute.org"}
 ]
@@ -51,8 +59,9 @@ profile = [
 default-groups = ["dev", "docs", "lint", "profile"]
 
 [project.urls]
-Homepage = "https://github.com/ceesem/standard_transform"
-Repository = "https://github.com/ceesem/standard_transform"
+Homepage = "https://github.com/CAVEconnectome/standard_transform"
+Documentation = "https://caveconnectome.github.io/standard_transform/"
+Repository = "https://github.com/CAVEconnectome/standard_transform"
 
 [tool.bumpversion]
 current_version = "1.4.1"

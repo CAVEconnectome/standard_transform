@@ -34,11 +34,11 @@ def root_location():
 
 
 def test_v1dd_streamline(pts_arb, pts_vx, pts_nm, root_location):
-    sl_pts_arb = v1dd_ds.streamline_res([9.7, 9.7, 45]).radial_points(
+    sl_pts_arb = v1dd_ds.streamline([9.7, 9.7, 45]).radial_points(
         root_location / [9.7, 9.7, 45], pts_arb
     )
-    sl_pts_vx = v1dd_ds.streamline_vx.radial_points(root_location / [9, 9, 45], pts_vx)
-    sl_pts_nm = v1dd_ds.streamline_nm.radial_points(root_location, pts_nm)
+    sl_pts_vx = v1dd_ds.streamline("vx").radial_points(root_location / [9, 9, 45], pts_vx)
+    sl_pts_nm = v1dd_ds.streamline("nm").radial_points(root_location, pts_nm)
 
     assert np.all(np.isclose(sl_pts_nm, sl_pts_vx))
 
@@ -46,8 +46,8 @@ def test_v1dd_streamline(pts_arb, pts_vx, pts_nm, root_location):
 
 
 def test_v1dd_streamline_inverse(root_location):
-    sl_pts_0 = v1dd_ds.streamline_nm.streamline_points_tform(root_location)
-    sl_pts_1 = v1dd_ds.streamline_res([9.7, 9.7, 45]).streamline_points_tform(
+    sl_pts_0 = v1dd_ds.streamline("nm").streamline_points_tform(root_location)
+    sl_pts_1 = v1dd_ds.streamline([9.7, 9.7, 45]).streamline_points_tform(
         root_location / [9.7, 9.7, 45]
     ) * [9.7, 9.7, 45]
     assert np.all(np.isclose(sl_pts_0, sl_pts_1))
