@@ -25,4 +25,4 @@ from .streamlines import (
     streamline_field_from_paths,
 )
 
-__version__ = "1.4.1"
+__version__ = "2.0.0"
