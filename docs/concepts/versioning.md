@@ -21,9 +21,25 @@ change on different schedules:
 - the **transform** track — the affine numbers;
 - the **streamline** track — the depth-axis data.
 
-For example, in the `2.0` release the v1dd and Minnie65 streamlines change (hand-drawn
-→ field) but the affine numbers do not, so each transform stays at its `1.4` version
-while the streamline advances to `2.0`.
+For example, in the `2.0` release both datasets' streamlines change (hand-drawn → field).
+Minnie65's affine numbers do not change, so its transform stays at `1.4` while its
+streamline advances to `2.0`. v1dd's affine *does* change in `2.0` (a revised pia point,
+a ~39 µm depth shift), so its transform advances to `2.0` too. The tracks move
+independently — but they are not unrelated, which is why streamlines pin a transform (see
+below).
+
+## Streamlines pin the transform they were built in
+
+A streamline's geometry lives in the oriented frame of a *specific* transform version —
+a field's tangent grid is baked in that frame, and the hand curves were traced in it. So
+each streamline version **pins** the transform version it belongs to, and is always built
+against that transform, never merely "whatever is latest". This keeps a streamline valid
+even when the affine changes: v1dd's `2.0` field pins transform `2.0` (its new frame),
+while its `1.4` hand curve still pins transform `1.4`; Minnie65's field pins transform
+`1.4` because its affine never changed. Field `.npz` files also stamp the transform frame
+(plus the build method and λ) as provenance, and loading a field against a mismatched
+transform warns. `available_versions` exposes each streamline version's pinned transform
+under `transform_versions`.
 
 ## Package-version-anchored labels
 
@@ -32,14 +48,15 @@ A version label **is the release in which that definition became the default**. 
 `version="2.0"` means "the definition that became default in 2.0." Asking for a label
 reproduces exactly what that release produced.
 
-| dataset | track | version | what it is |
-|---|---|---|---|
-| v1dd | transform | `1.4` (latest) | the affine frame (unchanged) |
-| v1dd | streamline | `1.4` | original hand-drawn single streamline |
-| v1dd | streamline | `2.0` (latest) | data-derived spatially-varying field |
-| minnie65 | transform | `1.4` (latest) | the affine frame |
-| minnie65 | streamline | `1.4` | original hand-drawn single streamline |
-| minnie65 | streamline | `2.0` (latest) | data-derived spatially-varying field |
+| dataset | track | version | pins transform | what it is |
+|---|---|---|---|---|
+| v1dd | transform | `1.4` | — | original affine frame |
+| v1dd | transform | `2.0` (latest) | — | revised pia point (~39 µm depth shift) |
+| v1dd | streamline | `1.4` | `1.4` | original hand-drawn single streamline |
+| v1dd | streamline | `2.0` (latest) | `2.0` | data-derived spatially-varying field |
+| minnie65 | transform | `1.4` (latest) | — | the affine frame (unchanged) |
+| minnie65 | streamline | `1.4` | `1.4` | original hand-drawn single streamline |
+| minnie65 | streamline | `2.0` (latest) | `1.4` | data-derived spatially-varying field |
 
 ## Pinning a version
 
@@ -64,8 +81,10 @@ record exactly which definition produced its numbers:
 
 ```python
 tf = v1dd_ds.transform()
-tf.version          # -> "1.4"
-v1dd_ds.streamline().version   # -> "2.0"
+tf.version          # -> "2.0"
+sl = v1dd_ds.streamline()
+sl.version                 # -> "2.0"  (streamline version)
+sl.built_transform_version # -> "2.0"  (the transform frame it was built in)
 ```
 
 ## Inspecting what's available
@@ -78,7 +97,9 @@ from standard_transform import available_versions
 
 available_versions("v1dd")
 # {
-#   "transform":  {"latest": "1.4", "versions": {"1.4": "1.4"}},
-#   "streamline": {"latest": "2.0", "versions": {"1.4": "1.4", "2.0": "2.0"}},
+#   "transform":  {"latest": "2.0", "versions": {"1.4": "1.4", "2.0": "2.0"}},
+#   "streamline": {"latest": "2.0",
+#                  "versions": {"1.4": "1.4", "2.0": "2.0"},
+#                  "transform_versions": {"1.4": "1.4", "2.0": "2.0"}},
 # }
 ```

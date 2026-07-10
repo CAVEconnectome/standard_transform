@@ -23,6 +23,11 @@ k-fold CV sweep of the smoothness weight and builds at the selected value instea
 hand-setting ``--laplace-strength``. The chosen method and lambda are stamped into the
 .npz alongside the transform frame.
 
+The oriented frame is built in the transform version *pinned by this dataset's field
+streamline entry* in the registry (not merely the latest transform), so the file always
+matches its registry slot. ``--transform-version`` overrides that for the rare case of
+intentionally building a new frame (warns if it disagrees with the pin).
+
 The v1dd apical-path dataset used for the shipped field is archived at: <archive URL>
 """
 
@@ -35,11 +40,40 @@ import numpy as np
 
 import standard_transform
 from standard_transform import streamline_field_from_paths
-from standard_transform.datasets import minnie_transform, v1dd_transform
+from standard_transform.datasets import (
+    _STREAMLINE_VERSIONS,
+    minnie_transform,
+    v1dd_transform,
+)
 
 TRANSFORMS = {"v1dd": v1dd_transform, "minnie": minnie_transform}
+# The CLI/transform key ("minnie") differs from the registry key ("minnie65").
+REGISTRY_DATASET = {"v1dd": "v1dd", "minnie": "minnie65"}
 DATA_DIR = os.path.join(os.path.dirname(standard_transform.__file__), "data")
 DEFAULT_LAMBDA_GRID = (0.01, 0.02, 0.05, 0.1, 0.2, 0.4)
+
+
+def pinned_transform_version(dataset, out_basename):
+    """Transform version the streamline registry pins for the field being written.
+
+    The field's oriented frame is owned by the registry, not by "whatever transform is
+    latest at build time". Find the ``kind == "field"`` streamline entry for this dataset
+    -- preferring the one whose file matches ``out_basename``, else the sole field entry --
+    and return ``(streamline_version, transform_version)`` it pins, or ``(None, None)`` if
+    it can't be determined (custom output, or multiple ambiguous field entries).
+    """
+    fields = {
+        v: e
+        for v, e in _STREAMLINE_VERSIONS[REGISTRY_DATASET[dataset]].items()
+        if e["kind"] == "field"
+    }
+    for v, e in fields.items():
+        if e["file"] == out_basename:
+            return v, e["transform_version"]
+    if len(fields) == 1:
+        (v, e), = fields.items()
+        return v, e["transform_version"]
+    return None, None
 
 
 def load_paths(directory):
@@ -151,12 +185,44 @@ def main():
     ap.add_argument("--tune-folds", type=int, default=5, help="folds for --tune-lambda")
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument(
+        "--transform-version",
+        default=None,
+        help="transform version to build the field's oriented frame in. Default: the "
+        "version pinned by this dataset's field streamline entry in the registry (NOT "
+        "merely the latest transform). Override only when intentionally building a new "
+        "frame, which should come with a new streamline registry entry.",
+    )
+    ap.add_argument(
         "--validate", type=int, default=0, metavar="N", help="hold out N paths for a QC report"
     )
     args = ap.parse_args()
 
-    tform_fn = TRANSFORMS[args.dataset]
+    raw_tform_fn = TRANSFORMS[args.dataset]
     out = args.out or os.path.join(DATA_DIR, f"{args.dataset}_streamline_field.npz")
+
+    # Resolve which transform frame to build in. The registry (the streamline field
+    # entry) owns this; --transform-version overrides. Warn if an override disagrees with
+    # the pin, since the resulting file would not match its registry slot's frame.
+    sl_ver, pinned_tv = pinned_transform_version(args.dataset, os.path.basename(out))
+    if args.transform_version is not None:
+        tv = args.transform_version
+        if pinned_tv is not None and tv != pinned_tv:
+            print(
+                f"WARNING: --transform-version {tv!r} does not match the transform pinned "
+                f"by the {args.dataset} field streamline entry {sl_ver!r} ({pinned_tv!r}); "
+                f"the built field will not match its registry slot's frame."
+            )
+    elif pinned_tv is not None:
+        tv = pinned_tv
+        print(f"building in transform frame v{tv} (pinned by streamline {sl_ver!r})")
+    else:
+        tv = None  # fall back to latest
+        print("building in the latest transform frame (no registry pin found)")
+
+    # Bind the chosen version so all helpers (build / tune / validate) use the same frame.
+    def tform_fn():
+        return raw_tform_fn(version=tv)
+
     paths = load_paths(args.paths)
     print(f"loaded {len(paths)} paths from {args.paths}")
 

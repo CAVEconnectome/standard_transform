@@ -3,7 +3,7 @@
 A [`StreamlineField`](../concepts/streamlines-vs-field.md) is estimated offline from
 a collection of **pia → white matter paths** — one per neuron — and shipped as a
 compressed `.npz`. This guide shows how to build one. For the reasoning behind each
-step (depth band, precision, diffusion), read
+step (depth band, precision, the curl-free potential fit), read
 [Streamline field: method](../streamline-field-method.md).
 
 ## The input: one tall path per neuron
@@ -32,12 +32,21 @@ Arguments:
 | `--paths` | directory of per-neuron `.npy` files (native nm; only x,y,z used) |
 | `--dataset` | selects the nm transform and default output name (`v1dd` or `minnie`) |
 | `--out` | output `.npz` path (default `standard_transform/data/<dataset>_streamline_field.npz`) |
+| `--method` | regularizer: `laplace-fit` (default, curl-free) or `diffusion` (legacy) |
 | `--bin-size` | grid spacing X Y Z in microns (default `30 20 30`) |
 | `--depth-band` | in-band depth range LO HI in microns (default `150 700`) |
+| `--laplace-strength` | smoothness weight λ for the Laplace methods (default `0.05`) |
+| `--tune-lambda` | CV-select λ over `--lambda-grid` (1-SE rule) and build at it — use this instead of hand-setting `--laplace-strength` |
+| `--transform-version` | transform frame to build in (default: the version pinned by the dataset's field registry entry; warns if you override to a non-pinned version) |
 | `--validate N` | hold out `N` paths, rebuild on the rest, and report held-out median lateral deviation as a QC check |
 
 The shipped field is always built on **all** paths; `--validate` only builds a
-throwaway field for quality reporting.
+throwaway field for quality reporting. Recommended invocation lets CV pick λ:
+
+```bash
+uv run python scripts/build_streamline_field.py --paths /path/to/apical_paths \
+    --dataset v1dd --tune-lambda
+```
 
 ## Build programmatically
 
@@ -61,9 +70,14 @@ list):
 - `weights` — per-path or per-segment weights to down-weight unreliable structure
   (e.g. by Strahler index / inverse branch order).
 - `depth_band` — only segments in this depth range inform the field, and the grid
-  spans exactly this range; outside it, orientation is held constant.
-- `smoothing_passes` / `smoothing_strength` — control the precision-weighted
-  diffusion that fills empty cells and denoises.
+  spans exactly this range; outside it (in depth), orientation is held constant.
+- `method` — `"laplace-fit"` (default, curl-free potential fit) or `"diffusion"`
+  (legacy independent-component smoothing).
+- `laplace_strength` — the Laplace fit's smoothness weight λ (default `0.05`; prefer
+  choosing it by CV via the script's `--tune-lambda`).
+- `edge_extrapolation` — `"hold"` (default) continues the trend into data-poor lateral
+  margins; `"harmonic"` recovers the old relax-to-vertical behavior.
+- `smoothing_passes` / `smoothing_strength` — only used by `method="diffusion"`.
 
 ## Persist and reload
 
@@ -81,7 +95,8 @@ differs. The transform is not saved in the file; you reattach one on load.
 ## Wire it into a dataset
 
 Once a field `.npz` exists in `standard_transform/data/`, add a row to the streamline
-version registry in `datasets.py` pointing at it and mark it latest — the dataset's
-`streamline()` then returns it by default, while the prior `version="1.4"` hand-drawn
-curve stays reachable. This mirrors how v1dd is wired; see
-[Versioning & reproducibility](../concepts/versioning.md).
+version registry in `datasets.py` pointing at it — including the `transform_version` it
+was built in (its `.npz` stamp tells you) — and mark it latest. The dataset's
+`streamline()` then returns it by default, built against that pinned transform, while the
+prior `version="1.4"` hand-drawn curve stays reachable. This mirrors how v1dd is wired;
+see [Versioning & reproducibility](../concepts/versioning.md).

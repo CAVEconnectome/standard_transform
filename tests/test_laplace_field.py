@@ -59,6 +59,26 @@ def test_unknown_method_raises():
         streamline_field_from_paths(_toy_paths(), transform_points=False, method="nope")
 
 
+def test_edge_extrapolation_holds_vs_collapses():
+    # Data only in a central x-block with a consistent tilt; the margins are empty.
+    from standard_transform.streamlines import _laplace_field
+
+    nx, ny, nz, bs = 30, 20, 30, (30.0, 20.0, 30.0)
+    prec = np.zeros((nx, ny, nz))
+    prec[8:22] = 5.0
+    mean_t = np.zeros((nx, ny, nz, 2))
+    mean_t[8:22, :, :, 0] = 0.20
+
+    harmonic = _laplace_field(mean_t, prec, bs, mode="fit", lam_rel=0.05, edge_extrapolation="harmonic")
+    hold = _laplace_field(mean_t, prec, bs, mode="fit", lam_rel=0.05, edge_extrapolation="hold")
+
+    # data region unchanged by the extrapolation choice
+    assert np.allclose(harmonic[8:22, :, :, 0].mean(), hold[8:22, :, :, 0].mean(), atol=0.02)
+    # harmonic relaxes the edge tangent toward vertical (0); hold continues the trend
+    assert abs(harmonic[0, :, :, 0].mean()) < 0.03
+    assert hold[0, :, :, 0].mean() > 0.15
+
+
 def test_build_provenance_roundtrips(tmp_path):
     field = streamline_field_from_paths(
         _toy_paths(), transform_points=False, method="laplace-fit", depth_band=(150.0, 700.0)

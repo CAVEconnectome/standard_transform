@@ -35,7 +35,7 @@ def test_available_versions_shape():
     assert av["streamline"]["transform_versions"] == {"1.4": "1.4", "2.0": "2.0"}
     assert v1dd_ds.available_versions() == av
     minnie_sl = available_versions("minnie65")["streamline"]
-    assert minnie_sl["latest"] == "1.4"
+    assert minnie_sl["latest"] == "2.0"
     assert set(minnie_sl["versions"]) == {"1.4", "2.0"}
     # minnie affine is unchanged, so both streamlines live in the 1.4 frame
     assert minnie_sl["transform_versions"] == {"1.4": "1.4", "2.0": "1.4"}
@@ -110,8 +110,8 @@ def test_resolution_equivalence(sample_pts):
     [(v1dd_streamline, "v1dd"), (minnie_streamline, "minnie65")],
 )
 def test_streamline_version_kinds(streamline_fn, dataset):
-    # The default follows the dataset's streamline latest (v1dd -> field, minnie -> hand),
-    # but both a hand (1.4) and a field (2.0) are always reachable by explicit version.
+    # The default follows the dataset's streamline latest (both now the 2.0 field), but
+    # both a hand (1.4) and a field (2.0) are always reachable by explicit version.
     latest = available_versions(dataset)["streamline"]["latest"]
     default = streamline_fn()
     assert default.version == latest
@@ -122,8 +122,9 @@ def test_streamline_version_kinds(streamline_fn, dataset):
     assert isinstance(hand, Streamline) and not isinstance(hand, StreamlineField)
     assert hand.version == "1.4"
 
-    assert isinstance(v1dd_ds.streamline(), StreamlineField)  # v1dd default is the field
-    assert not isinstance(minnie_ds.streamline(), StreamlineField)  # minnie default is hand
+    # both datasets now default to the field
+    assert isinstance(v1dd_ds.streamline(), StreamlineField)
+    assert isinstance(minnie_ds.streamline(), StreamlineField)
 
 
 @pytest.mark.parametrize("streamline_fn", [v1dd_streamline, minnie_streamline])

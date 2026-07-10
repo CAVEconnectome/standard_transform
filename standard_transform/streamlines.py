@@ -820,9 +820,61 @@ def _precision_smooth(mean_t, prec, n_passes, lam):
     return m, p
 
 
+def _hold_fill(field, data_mask, smooth_passes=8):
+    """Extrapolate a fitted tangent field into data-poor cells by holding the trend.
+
+    Each non-data cell is set to the tangent of its nearest in-data cell (a nearest-
+    neighbour / Voronoi continuation), so the field *holds* the boundary trend outward
+    rather than decaying toward vertical -- which is what the harmonic potential does at
+    the margins and what collapses depth-integrated quantities there. (A Laplace
+    relaxation would give the same "hold" in the limit but needs far more iterations than
+    is worthwhile; nearest continuation is exact and cheap.) A few edge-safe neighbour-
+    averaging passes then soften the Voronoi seams without reintroducing any decay --
+    everything outside the data is already at a held value, so averaging preserves it.
+    Data cells are never modified, so the curl-free fit is untouched where it is informed.
+
+    Parameters
+    ----------
+    field : (nx, ny, nz, 2) array
+        Tangent field; data cells carry the fitted values to be held.
+    data_mask : (nx, ny, nz) bool array
+        True where the cell had data (held fixed).
+    smooth_passes : int
+        Neighbour-averaging passes over the extrapolated cells to soften seams.
+
+    Returns
+    -------
+    (nx, ny, nz, 2) array
+        Field with data cells unchanged and non-data cells filled by held extrapolation.
+    """
+    from scipy.ndimage import distance_transform_edt
+
+    empty = ~data_mask
+    # nearest in-data cell index for every cell -> continue that tangent outward
+    idx = distance_transform_edt(empty, return_indices=True)[1]
+    f = field.copy()
+    f[empty] = field[idx[0], idx[1], idx[2]][empty]
+
+    for _ in range(smooth_passes):
+        num = np.zeros_like(f)
+        cnt = np.zeros(f.shape[:3])
+        for axis in range(3):
+            for shift in (-1, 1):
+                sh = np.roll(f, shift, axis=axis)
+                keep = np.ones(f.shape[:3])
+                sl = [slice(None)] * 3
+                sl[axis] = 0 if shift == 1 else -1
+                keep[tuple(sl)] = 0.0  # rolled-in boundary plane wrapped -> drop it
+                num += keep[..., None] * sh
+                cnt += keep
+        upd = empty & (cnt > 0)
+        f[upd] = num[upd] / cnt[upd][:, None]
+    return f
+
+
 def _laplace_field(
     mean_t, prec, bs, mode="fit", lam_rel=0.3, deep_layers=1, bc_weight=1e3,
-    bc_shallow_empirical=False,
+    bc_shallow_empirical=False, edge_extrapolation="hold",
 ):
     """Recover a tangent field as the gradient of a scalar depth potential (a PDE fit).
 
@@ -862,6 +914,15 @@ def _laplace_field(
         Number of deep (and shallow) y-layers used as boundaries in ``bc`` mode.
     bc_weight : float
         Boundary data weight in ``bc`` mode (>> interior, approximating a hard BC).
+    edge_extrapolation : {"hold", "harmonic"}
+        How the field behaves in data-poor cells (``fit`` mode only). ``"harmonic"`` keeps
+        the raw potential solution, whose natural boundary condition relaxes the tangent
+        toward vertical (zero) beyond the data -- which collapses depth-integrated
+        quantities like displacement to ~0 at the margins. ``"hold"`` (default) instead
+        continues the nearest in-data tangent outward (see :func:`_hold_fill`), leaving
+        the data region's curl-free fit untouched but giving an approximately-right,
+        non-collapsing extrapolation in data-poor regions. The extrapolated cells are no
+        longer curl-free, but they carry no data anyway (flag them with ``coverage_at``).
 
     Returns
     -------
@@ -937,6 +998,14 @@ def _laplace_field(
     out = np.zeros_like(mean_t)
     out[..., 0] = np.gradient(psi, hx, axis=0)
     out[..., 1] = np.gradient(psi, hz, axis=2)
+
+    if mode == "fit" and edge_extrapolation == "hold":
+        # Replace the potential's relax-to-vertical extrapolation in data-poor cells with
+        # a held continuation of the nearest fitted tangents. Data cells are unchanged, so
+        # the curl-free fit is preserved exactly where it is informed by data.
+        data_mask = prec > 0
+        if data_mask.any() and not data_mask.all():
+            out = _hold_fill(out, data_mask)
     return out
 
 
@@ -955,6 +1024,7 @@ def streamline_field_from_paths(
     smoothing_strength=0.5,
     laplace_strength=0.05,
     bc_deep_layers=1,
+    edge_extrapolation="hold",
     integration_step=None,
 ) -> StreamlineField:
     """Build a :class:`StreamlineField` from a collection of pia-to-white-matter paths.
@@ -1016,6 +1086,12 @@ def streamline_field_from_paths(
     bc_deep_layers : int, optional
         Number of deep/shallow y-layers used as boundaries for ``method="laplace-bc"``,
         by default 1.
+    edge_extrapolation : {"hold", "harmonic"}, optional
+        Behavior in data-poor cells for ``method="laplace-fit"``, by default ``"hold"``:
+        continue the nearest in-data tangent outward rather than letting the potential
+        relax toward vertical (which collapses depth-integrated quantities at the
+        margins). The data region's curl-free fit is unchanged either way. See
+        :func:`_laplace_field`.
     integration_step : float, optional
         Passed through to the resulting field. By default None (uses the y bin size).
 
@@ -1131,7 +1207,8 @@ def streamline_field_from_paths(
     elif method in ("laplace-fit", "laplace-bc"):
         mode = "fit" if method == "laplace-fit" else "bc"
         mean_t = _laplace_field(
-            mean_t, prec, bs, mode=mode, lam_rel=laplace_strength, deep_layers=bc_deep_layers
+            mean_t, prec, bs, mode=mode, lam_rel=laplace_strength,
+            deep_layers=bc_deep_layers, edge_extrapolation=edge_extrapolation,
         )
     else:
         raise ValueError(
