@@ -98,7 +98,7 @@ _STREAMLINE_VERSIONS = {
 # Defaults align each dataset to a single version: minnie65 stays on 1.4 (its affine is
 # unchanged and it defaults to the hand streamline; the field is reachable via "2.0"),
 # while v1dd advances to 2.0 (new pia-point transform + rebuilt field).
-_STREAMLINE_LATEST = {"minnie65": "1.4", "v1dd": "2.0"}
+_STREAMLINE_LATEST = {"minnie65": "2.0", "v1dd": "2.0"}
 
 
 def _resolve(registry, latest, dataset, version, kind_label):
