@@ -16,8 +16,9 @@ Add ``--validate 800`` to also hold out 800 paths, rebuild on the rest, and repo
 held-out in-band median lateral deviation (the shipped field is always built on ALL
 paths; validation builds a separate throwaway field purely to report the number).
 
-Pick the regularizer with ``--method`` (``diffusion`` default; ``laplace-fit`` fits a
-curl-free scalar-potential field). For the Laplace methods, ``--tune-lambda`` runs a
+Pick the regularizer with ``--method`` (``laplace-fit`` default -- a curl-free
+scalar-potential field; ``diffusion`` is the older independent-component smoothing). For
+the Laplace methods, ``--tune-lambda`` runs a
 k-fold CV sweep of the smoothness weight and builds at the selected value instead of
 hand-setting ``--laplace-strength``. The chosen method and lambda are stamped into the
 .npz alongside the transform frame.
@@ -48,7 +49,7 @@ def load_paths(directory):
     return [np.load(f)[:, :3].astype(float) for f in files]
 
 
-def build(paths, tform_fn, bin_size, depth_band, method="diffusion", laplace_strength=0.05):
+def build(paths, tform_fn, bin_size, depth_band, method="laplace-fit", laplace_strength=0.05):
     return streamline_field_from_paths(
         paths,
         tform=tform_fn(),
@@ -134,9 +135,9 @@ def main():
     )
     ap.add_argument(
         "--method",
-        default="diffusion",
-        choices=("diffusion", "laplace-fit", "laplace-bc"),
-        help="field regularizer (default diffusion)",
+        default="laplace-fit",
+        choices=("laplace-fit", "diffusion", "laplace-bc"),
+        help="field regularizer (default laplace-fit)",
     )
     ap.add_argument(
         "--laplace-strength", type=float, default=0.05, help="lambda for the Laplace methods"

@@ -950,7 +950,7 @@ def streamline_field_from_paths(
     depth_band=(150.0, 700.0),
     min_dy=1e-3,
     normalize_per_path=False,
-    method="diffusion",
+    method="laplace-fit",
     smoothing_passes=None,
     smoothing_strength=0.5,
     laplace_strength=0.05,
@@ -997,12 +997,12 @@ def streamline_field_from_paths(
         If True, scale each path's segment weights to sum to 1 so every neuron
         contributes equally regardless of how many segments (branches) it has. By
         default False. Combine with a single tall path per cell, or with weights.
-    method : {"diffusion", "laplace-fit", "laplace-bc"}, optional
+    method : {"laplace-fit", "diffusion", "laplace-bc"}, optional
         How the binned per-cell tangents are regularized into a full field, by default
-        ``"diffusion"`` (precision-weighted diffusion of the two components; the shipped
-        behavior). ``"laplace-fit"`` and ``"laplace-bc"`` instead fit a scalar depth
-        potential (see :func:`_laplace_field`), which is curl-free by construction:
-        ``"laplace-fit"`` keeps a precision-weighted data term in every cell, while
+        ``"laplace-fit"``: fit a curl-free scalar depth potential with a precision-
+        weighted data term in every cell (see :func:`_laplace_field`), which also fills
+        gaps harmonically. ``"diffusion"`` is the older precision-weighted diffusion of
+        the two tangent components independently (no integrability constraint).
         ``"laplace-bc"`` uses only the deep boundary as an empirical condition with a
         flat shallow face and pure Laplace in between.
     smoothing_passes : int, optional
