@@ -74,6 +74,7 @@ nav:
       - Cortical depth & radial distance: guides/depth-radial.md
       - Morphology objects (deprecated): guides/skeletons-meshworks.md
       - Per-neuron streamline workflow: guides/per-neuron-streamline.md
+      - Straightened streamline space: guides/streamline-space.md
       - Build a field for a new dataset: guides/build-a-field.md
   - Streamline field method: streamline-field-method.md
   - Datasets: datasets.md

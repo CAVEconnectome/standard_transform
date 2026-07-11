@@ -4,6 +4,11 @@ When your streamline is a [`StreamlineField`](../concepts/streamlines-vs-field.m
 the recommended workflow for a single neuron is to **integrate the field once at the
 cell body**, then apply that one fixed curve across the entire arbor.
 
+!!! tip "Comparing cells to each other?"
+    This workflow recenters each cell on its own soma. To place *multiple* cells in one
+    shared, curvature-straightened frame — keeping their relative positions — use
+    [Straightened streamline space](streamline-space.md) instead.
+
 ## Why not use the field directly per vertex?
 
 The field describes the *typical* pia → white matter direction at each location,
