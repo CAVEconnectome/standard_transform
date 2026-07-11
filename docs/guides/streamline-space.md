@@ -55,6 +55,20 @@ Every cell lands at its true relative position with curvature straightened out �
 per-cell recentering. Pass `transform_points=False` if your points are already in oriented
 microns rather than native nm.
 
+## Anchoring to a non-negative frame
+
+By default the unfolded lateral coordinates are in oriented microns and can be negative.
+Pass `anchor=True` to shift them so the **smallest `x`/`z` in the data sit at 0**, giving a
+non-negative frame with the data's minimum corner at `(0, pia, 0)` — convenient for
+gridding or array-indexed heatmaps. Depth is left unchanged (pia stays the `y` origin, so
+`y` is distance-from-pia). Use the same `anchor` for the inverse.
+
+```python
+ss   = field.to_streamline_space(pts, anchor=True)     # u, w >= 0; min corner at 0
+back = field.from_streamline_space(ss, anchor=True)     # exact inverse
+field.streamline_space_origin()                         # the (u_min, 0, w_min) offset
+```
+
 ## Options and notes
 
 - **`reference_depth`** — the depth at which streamlines are labeled (default `0.0`, the

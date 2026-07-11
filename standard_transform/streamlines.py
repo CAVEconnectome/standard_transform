@@ -738,7 +738,27 @@ class StreamlineField(Streamline):
             xyz = self._transform.apply(xyz)
         return self._conf_interp(np.atleast_2d(xyz))
 
-    def to_streamline_space(self, xyz, reference_depth=0.0, transform_points=True) -> np.ndarray:
+    def streamline_space_origin(self, reference_depth=0.0) -> np.ndarray:
+        """Origin used by the ``anchor=True`` option of :meth:`to_streamline_space`.
+
+        Returns ``(u_min, 0.0, w_min)``: the minimum unfolded lateral position over the
+        field's grid extent at ``reference_depth`` (with pia, ``y = 0``, as the depth
+        origin). Subtracting this puts the smallest ``x``/``z`` in the data at 0 while
+        leaving depth as distance-from-pia. Cached per ``reference_depth``.
+        """
+        key = float(reference_depth)
+        cache = getattr(self, "_ss_origin_cache", None)
+        if cache is None:
+            cache = self._ss_origin_cache = {}
+        if key not in cache:
+            gx, gy, gz = np.meshgrid(self._x_grid, self._y_grid, self._z_grid, indexing="ij")
+            u, w = self._march_to(gx.ravel(), gy.ravel(), gz.ravel(), key)
+            cache[key] = np.array([float(u.min()), 0.0, float(w.min())])
+        return cache[key]
+
+    def to_streamline_space(
+        self, xyz, reference_depth=0.0, transform_points=True, anchor=False
+    ) -> np.ndarray:
         """Map points into a single *global* straightened (unfolded) streamline space.
 
         Each point maps to ``(u, y, w)``: the lateral position ``(u, w)`` of the
@@ -767,6 +787,12 @@ class StreamlineField(Streamline):
             If True, transform the input from pre-transform coordinates into the grid's
             oriented space first, by default True. The output is always in streamline
             space (oriented microns).
+        anchor : bool, optional
+            If True, shift the unfolded lateral coordinates so the smallest ``x``/``z`` in
+            the data land at 0 (via :meth:`streamline_space_origin`), giving a
+            non-negative frame with the data's minimum corner at ``(0, pia, 0)``. Depth is
+            unchanged (pia stays the ``y`` origin). By default False. Pass the same
+            ``anchor`` to :meth:`from_streamline_space` to invert.
 
         Returns
         -------
@@ -784,9 +810,14 @@ class StreamlineField(Streamline):
         if transform_points:
             xyz = self._transform.apply(xyz)
         u, w = self._march_to(xyz[:, 0], xyz[:, 1], xyz[:, 2], float(reference_depth))
-        return np.column_stack([u, xyz[:, 1], w])
+        out = np.column_stack([u, xyz[:, 1], w])
+        if anchor:
+            out = out - self.streamline_space_origin(reference_depth)
+        return out
 
-    def from_streamline_space(self, uyw, reference_depth=0.0, transform_points=True) -> np.ndarray:
+    def from_streamline_space(
+        self, uyw, reference_depth=0.0, transform_points=True, anchor=False
+    ) -> np.ndarray:
         """Inverse of :meth:`to_streamline_space`.
 
         Given ``(u, y, w)`` in streamline space, integrate the streamline anchored at
@@ -803,13 +834,18 @@ class StreamlineField(Streamline):
             Must match the value used in the forward map, by default 0.0.
         transform_points : bool, optional
             If True, invert the result back to pre-transform coordinates, by default True.
+        anchor : bool, optional
+            Must match the forward map: if True, undo the lateral anchoring shift before
+            integrating. By default False.
 
         Returns
         -------
         nx3 array
             Oriented (or pre-transform) coordinates.
         """
-        q = np.atleast_2d(_asfloat(uyw))
+        q = np.atleast_2d(_asfloat(uyw)).astype(float)
+        if anchor:
+            q = q + self.streamline_space_origin(reference_depth)
         ref = np.full(len(q), float(reference_depth))
         # march each labeled streamline (anchored at ref depth) down to its target depth
         x, z = self._march_to(q[:, 0], ref, q[:, 2], q[:, 1])

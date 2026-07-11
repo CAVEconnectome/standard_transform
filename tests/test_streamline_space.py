@@ -54,6 +54,23 @@ def test_reference_depth_consistency(field):
         assert np.abs(back - pts).max() < 1.0
 
 
+def test_anchor_puts_data_min_at_zero(field):
+    gx, gy, gz = np.meshgrid(field._x_grid, field._y_grid, field._z_grid, indexing="ij")
+    nodes = np.column_stack([gx.ravel(), gy.ravel(), gz.ravel()])
+    ss = field.to_streamline_space(nodes, transform_points=False, anchor=True)
+    assert ss[:, 0].min() == pytest.approx(0.0, abs=1e-6)  # smallest x -> 0
+    assert ss[:, 2].min() == pytest.approx(0.0, abs=1e-6)  # smallest z -> 0
+    assert ss[:, 0].min() >= -1e-9 and ss[:, 2].min() >= -1e-9  # non-negative
+    assert np.allclose(ss[:, 1], nodes[:, 1])  # depth unchanged (pia stays y=0)
+
+
+def test_anchor_roundtrip(field):
+    pts = _inband(60)
+    a = field.to_streamline_space(pts, transform_points=False, anchor=True)
+    back = field.from_streamline_space(a, transform_points=False, anchor=True)
+    assert np.abs(back - pts).max() < 1.0
+
+
 def test_transform_points_plumbing(field):
     # default transform_points=True: pre-transform (nm) in and out
     nm = field._transform.invert(_inband(20))
