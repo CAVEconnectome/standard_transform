@@ -554,6 +554,40 @@ class StreamlineField(Streamline):
         pt = np.array([[x, y, z]])
         return float(self._tx_interp(pt)[0]), float(self._tz_interp(pt)[0])
 
+    def _tangent_at_batch(self, x, y, z):
+        """Vectorized :meth:`_tangent_at` over 1-D arrays of points (same clamping)."""
+        x = np.clip(x, self._x_lo, self._x_hi)
+        y = np.clip(y, self._y_range[0], self._y_range[1])
+        z = np.clip(z, self._z_lo, self._z_hi)
+        pts = np.column_stack([x, y, z])
+        return self._tx_interp(pts), self._tz_interp(pts)
+
+    def _march_to(self, x, y, z, target, step=None):
+        """RK2-march a batch of points in ``y`` until each reaches ``target``.
+
+        Same midpoint scheme as :meth:`_march`, but vectorized over all points at once
+        (the field interpolator is batch-capable), so mapping many points is one set of
+        array ops per depth step rather than a per-point integration. ``target`` is a
+        scalar (all points to one depth) or a per-point array. Returns final ``(x, z)``.
+        """
+        x = np.asarray(x, dtype=float).copy()
+        y = np.asarray(y, dtype=float).copy()
+        z = np.asarray(z, dtype=float).copy()
+        target = np.broadcast_to(np.asarray(target, dtype=float), y.shape)
+        step = self._integration_step if step is None else step
+        # One cell per step; a couple extra for the final clamped partial step.
+        n_iter = int(np.ceil(np.abs(target - y).max() / step)) + 2 if y.size else 0
+        for _ in range(n_iter):
+            dy = np.clip(target - y, -step, step)
+            if not np.any(dy):
+                break
+            tx, tz = self._tangent_at_batch(x, y, z)
+            txm, tzm = self._tangent_at_batch(x + tx * dy / 2.0, y + dy / 2.0, z + tz * dy / 2.0)
+            x = x + txm * dy
+            z = z + tzm * dy
+            y = y + dy
+        return x, z
+
     def _march(self, x, y, z, y_target, step):
         """Integrate the field in y from (x, y, z) toward y_target (RK2 midpoint)."""
         xs, ys, zs = [x], [y], [z]
@@ -742,17 +776,15 @@ class StreamlineField(Streamline):
 
         Notes
         -----
-        Each point lies on its own streamline, so this integrates one streamline per
-        point; for very large inputs it is correspondingly O(n) field integrations.
+        The integration is vectorized: all points are marched through the field together
+        (one set of array ops per depth step), so this is exact and fast even for large
+        inputs -- no per-point streamline solve, and no interpolation approximation.
         """
         xyz = np.atleast_2d(_asfloat(xyz))
         if transform_points:
             xyz = self._transform.apply(xyz)
-        out = np.empty_like(xyz)
-        for i, p in enumerate(xyz):
-            u, w = self.streamline_at(p, float(reference_depth))
-            out[i] = (u, p[1], w)
-        return out
+        u, w = self._march_to(xyz[:, 0], xyz[:, 1], xyz[:, 2], float(reference_depth))
+        return np.column_stack([u, xyz[:, 1], w])
 
     def from_streamline_space(self, uyw, reference_depth=0.0, transform_points=True) -> np.ndarray:
         """Inverse of :meth:`to_streamline_space`.
@@ -778,11 +810,10 @@ class StreamlineField(Streamline):
             Oriented (or pre-transform) coordinates.
         """
         q = np.atleast_2d(_asfloat(uyw))
-        out = np.empty_like(q)
-        for i in range(len(q)):
-            u, y, w = q[i]
-            x, z = self.streamline_at(np.array([u, float(reference_depth), w]), float(y))
-            out[i] = (x, y, z)
+        ref = np.full(len(q), float(reference_depth))
+        # march each labeled streamline (anchored at ref depth) down to its target depth
+        x, z = self._march_to(q[:, 0], ref, q[:, 2], q[:, 1])
+        out = np.column_stack([x, q[:, 1], z])
         if transform_points:
             out = self._transform.invert(out)
         return out
