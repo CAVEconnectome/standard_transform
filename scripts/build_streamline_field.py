@@ -83,7 +83,10 @@ def load_paths(directory):
     return [np.load(f)[:, :3].astype(float) for f in files]
 
 
-def build(paths, tform_fn, bin_size, depth_band, method="laplace-fit", laplace_strength=0.05):
+def build(
+    paths, tform_fn, bin_size, depth_band, method="laplace-fit", laplace_strength=0.05,
+    compute_data_anchor=False,
+):
     return streamline_field_from_paths(
         paths,
         tform=tform_fn(),
@@ -91,6 +94,7 @@ def build(paths, tform_fn, bin_size, depth_band, method="laplace-fit", laplace_s
         depth_band=tuple(depth_band),
         method=method,
         laplace_strength=laplace_strength,
+        compute_data_anchor=compute_data_anchor,
     )
 
 
@@ -245,7 +249,8 @@ def main():
     stamp_lam = lam if method.startswith("laplace") else None
 
     t0 = time.time()
-    field = build(paths, tform_fn, args.bin_size, args.depth_band, method, lam)
+    # The shipped field bakes a fixed streamline-space anchor from the build data.
+    field = build(paths, tform_fn, args.bin_size, args.depth_band, method, lam, compute_data_anchor=True)
     # to_npz stamps the transform frame, method, and lambda so a stale or mismatched
     # field is self-describing (and a wrong-frame attach is caught on load).
     field.to_npz(out, method=method, laplace_strength=stamp_lam)

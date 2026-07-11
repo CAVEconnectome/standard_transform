@@ -506,6 +506,10 @@ class StreamlineField(Streamline):
         self.built_transform_version = None
         self.build_method = None
         self.build_laplace_strength = None
+        # Fixed streamline-space origin (u_min, 0, w_min) from the paths that built the
+        # field; set by streamline_field_from_paths and persisted in the .npz. None until
+        # then (then streamline_space_origin falls back to the grid extent).
+        self.build_data_anchor = None
 
         self._x_grid = np.asarray(x_grid, dtype=float)
         self._y_grid = np.asarray(y_grid, dtype=float)
@@ -741,11 +745,19 @@ class StreamlineField(Streamline):
     def streamline_space_origin(self, reference_depth=0.0) -> np.ndarray:
         """Origin used by the ``anchor=True`` option of :meth:`to_streamline_space`.
 
-        Returns ``(u_min, 0.0, w_min)``: the minimum unfolded lateral position over the
-        field's grid extent at ``reference_depth`` (with pia, ``y = 0``, as the depth
-        origin). Subtracting this puts the smallest ``x``/``z`` in the data at 0 while
-        leaving depth as distance-from-pia. Cached per ``reference_depth``.
+        Returns ``(u_min, 0.0, w_min)``, the minimum unfolded lateral position with pia
+        (``y = 0``) as the depth origin. Subtracting it puts the smallest ``x``/``z`` at 0
+        while leaving depth as distance-from-pia.
+
+        The origin is the **build-data anchor** when the field carries one
+        (``build_data_anchor`` -- computed from the paths that built the field and stored
+        in the ``.npz``, so it is a fixed, data-derived reference independent of the query
+        grid or ``reference_depth``). For fields with no stored anchor (older files, or
+        one constructed in memory) it falls back to the field's grid extent, unfolded at
+        ``reference_depth`` and cached.
         """
+        if self.build_data_anchor is not None:
+            return self.build_data_anchor
         key = float(reference_depth)
         cache = getattr(self, "_ss_origin_cache", None)
         if cache is None:
@@ -891,6 +903,11 @@ class StreamlineField(Streamline):
             build_laplace_strength=np.array(
                 np.nan if laplace_strength is None else float(laplace_strength)
             ),
+            build_data_anchor=(
+                np.asarray(self.build_data_anchor, dtype=float)
+                if self.build_data_anchor is not None
+                else np.empty(0)
+            ),
         )
 
     @classmethod
@@ -921,6 +938,8 @@ class StreamlineField(Streamline):
             if "build_laplace_strength" in dat:
                 val = float(dat["build_laplace_strength"])
                 field.build_laplace_strength = None if np.isnan(val) else val
+            if "build_data_anchor" in dat and dat["build_data_anchor"].size:
+                field.build_data_anchor = np.asarray(dat["build_data_anchor"], dtype=float)
         return field
 
 
@@ -1175,6 +1194,7 @@ def streamline_field_from_paths(
     laplace_strength=0.05,
     bc_deep_layers=1,
     edge_extrapolation="hold",
+    compute_data_anchor=False,
     integration_step=None,
 ) -> StreamlineField:
     """Build a :class:`StreamlineField` from a collection of pia-to-white-matter paths.
@@ -1242,6 +1262,11 @@ def streamline_field_from_paths(
         relax toward vertical (which collapses depth-integrated quantities at the
         margins). The data region's curl-free fit is unchanged either way. See
         :func:`_laplace_field`.
+    compute_data_anchor : bool, optional
+        If True, compute and store a fixed streamline-space origin from the build data
+        (:attr:`StreamlineField.build_data_anchor`), so ``anchor=True`` queries use a
+        stable, data-derived reference. By default False (it unfolds every segment
+        midpoint, so it is skipped for throwaway CV builds); the shipped fields set it.
     integration_step : float, optional
         Passed through to the resulting field. By default None (uses the y bin size).
 
@@ -1366,7 +1391,7 @@ def streamline_field_from_paths(
         )
 
     centers = [lo[a] + (np.arange(n[a]) + 0.5) * bs[a] for a in range(3)]
-    return StreamlineField(
+    field = StreamlineField(
         centers[0],
         centers[1],
         centers[2],
@@ -1375,6 +1400,16 @@ def streamline_field_from_paths(
         tform=tform,
         integration_step=integration_step,
     )
+    if compute_data_anchor:
+        # Fixed streamline-space origin from the build data itself: the minimum unfolded
+        # lateral position of the in-band segment midpoints (pia reference). Baked so
+        # anchor=True is a stable, data-derived reference (persisted by to_npz). Skipped by
+        # default because it unfolds every midpoint -- wasteful for throwaway CV builds.
+        uw = field.to_streamline_space(mids, transform_points=False)
+        field.build_data_anchor = np.array(
+            [float(uw[:, 0].min()), 0.0, float(uw[:, 2].min())]
+        )
+    return field
 
 
 identity_streamline = Streamline(points=np.array([[0, 0, 0], [0, 1000, 0]]))

@@ -69,6 +69,12 @@ back = field.from_streamline_space(ss, anchor=True)     # exact inverse
 field.streamline_space_origin()                         # the (u_min, 0, w_min) offset
 ```
 
+The origin is a **fixed, data-derived reference**: the shipped fields bake it from the
+minimum unfolded position of the paths that built them (`field.build_data_anchor`, stored
+in the `.npz`), so the anchored coordinate system is the same across sessions and does not
+depend on the query points. Fields without a stored anchor (older files, or one built
+without `compute_data_anchor=True`) fall back to the field's grid extent.
+
 ## Options and notes
 
 - **`reference_depth`** — the depth at which streamlines are labeled (default `0.0`, the
